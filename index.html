@@ -76,6 +76,17 @@ input[type=text],input[type=password],select{background:var(--surface);border:1p
 .pastille.unisson{background:var(--fond2);color:var(--encre);border:1px solid var(--trait)}
 .pastille.actif{outline:2px solid var(--encre);outline-offset:1px;opacity:1}
 .recherche{width:100%;margin-bottom:.6rem}
+.pastille.manquante{background:none;color:var(--discret);border:1px dashed var(--trait);font-weight:400;opacity:1}
+.pastille.manquante:hover{border-color:var(--c);color:var(--encre)}
+.legende-liste{display:flex;flex-direction:column;gap:.3rem;align-items:center;font-size:.75rem;color:var(--discret);margin:0 0 .75rem}
+.legende-liste .pastille{cursor:default}
+.division{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--discret);margin-left:.25rem}
+.division select{padding:.2rem .4rem;color:var(--encre)}
+.validation{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between;border:1px dashed var(--trait);border-radius:8px;padding:.45rem .7rem;font-size:.9rem;color:var(--discret)}
+.validation.ok{border:1px solid var(--ok);color:var(--encre);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.validation.ok b{color:var(--ok)}
+.validation em{color:var(--alerte);font-style:normal}
+.apercu-info .ok{color:var(--ok);font-weight:700}
 
 /* Éditeur */
 .editeur{display:flex;flex-direction:column;gap:.75rem}
@@ -182,6 +193,10 @@ var VOIX=[
 ];
 var VX={};VOIX.forEach(function(v,i){v.ordre=i;VX[v.code]=v});
 var HARMO={H:1,G:1,MG:1,MA:1,A:1};
+var PUPITRES=['G','MG','MA','A']; /* les quatre voix attendues pour chaque chant */
+function cleVoix(f){return f.voix+'|'+(f.variante||'')}
+function nomVoix(f){return (VX[f.voix]||VX.U).nom+(f.variante?' '+f.variante:'')}
+function ordreF(a,b){return (VX[a.voix].ordre-VX[b.voix].ordre)||String(a.variante||'').localeCompare(String(b.variante||''))}
 
 var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
 function tenue(w){return w.replace(/(\p{L})\1{2,}/giu,function(m){var c=Array.from(m);return c[0]+'<span class="tenu">'+c.slice(1).join('')+'</span>'})}
@@ -242,7 +257,7 @@ function ficheHTML(f,fs){
   var v=VX[f.voix]||VX.U,r=rendre(f.texte);
   return '<article class="fiche" style="--harmo:var(--v-'+v.code+');'+(fs?'--fs:'+fs+'pt':'')+'">'
     +'<header class="fiche-tete"><h1>'+esc(f.chant||'Sans titre')+'</h1>'
-    +'<p class="fiche-voix'+(v.code==='U'?' unisson':'')+'"><i></i>'+esc(v.nom)+'</p></header>'
+    +'<p class="fiche-voix'+(v.code==='U'?' unisson':'')+'"><i></i>'+esc(nomVoix(f))+'</p></header>'
     +'<div class="paroles'+(reglages.montees==='fleches'?'':' mots')+'" style="'+r.style+'">'+r.html+'</div></article>';
 }
 
@@ -362,7 +377,7 @@ function chants(){
   var g={};
   S.feuilles.forEach(function(f){(g[f.chant]=g[f.chant]||[]).push(f)});
   return Object.keys(g).sort(function(a,b){return a.localeCompare(b,'fr',{sensitivity:'base'})})
-    .map(function(k){return {chant:k,feuilles:g[k].sort(function(a,b){return VX[a.voix].ordre-VX[b.voix].ordre})}});
+    .map(function(k){return {chant:k,feuilles:g[k].sort(ordreF)}});
 }
 function soeurs(){var e=S.ed;if(!e)return [];return S.feuilles.filter(function(f){return f.chant===e.chantInitial&&f.id!==e.id})}
 
@@ -377,7 +392,7 @@ function ecranAtelier(){
     +'<p class="qui"><span id="qui"></span><button class="btn discret" data-a="deconnexion">Se déconnecter</button></p></header>'
     +'<main class="atelier"><section class="panneau biblio" aria-label="Bibliothèque"><h2>Chants</h2>'
     +'<input type="text" class="recherche" id="filtre" placeholder="Rechercher un chant" aria-label="Rechercher un chant">'
-    +'<ul id="liste"></ul><button class="btn" data-a="nouveau">Nouveau chant</button> <button class="btn discret" data-a="actualiser">Actualiser</button></section>'
+    +'<ul id="liste"></ul><p class="legende-liste" id="legende-liste"></p><button class="btn" data-a="nouveau">Nouveau chant</button> <button class="btn discret" data-a="actualiser">Actualiser</button></section>'
     +'<section class="panneau" aria-label="Rédaction"><h2>Rédaction</h2><div id="editeur"></div></section>'
     +'<section class="panneau" aria-label="Aperçu"><h2>Page imprimée</h2><p class="apercu-info" id="apercu-info"></p><div class="cadre" id="cadre"></div></section></main>';
   $('#format').value=reglages.format;$('#colonnes').value=reglages.colonnes;$('#montees').value=reglages.montees;
@@ -390,11 +405,14 @@ function majListe(){
   var html=chants().filter(function(c){return !q||c.chant.toLowerCase().indexOf(q)>=0}).map(function(c){
     var actif=e&&(e.chantInitial===c.chant);
     return '<li class="chant-item'+(actif?' actif':'')+'"><span class="chant-nom">'+esc(c.chant)+'</span><span class="pastilles">'
-      +c.feuilles.map(function(f){var v=VX[f.voix];return '<button class="pastille'+(v.code==='U'?' unisson':'')+(e&&e.id===f.id?' actif':'')+'" style="--c:var(--v-'+v.code+')" data-ouvrir="'+esc(f.id)+'" title="'+esc(c.chant+' – '+v.nom)+'">'+esc(v.nom)+'</button>'}).join('')
+      +c.feuilles.map(function(f){var v=VX[f.voix];return '<button class="pastille'+(v.code==='U'?' unisson':'')+(e&&e.id===f.id?' actif':'')+'" style="--c:var(--v-'+v.code+')" data-ouvrir="'+esc(f.id)+'" title="'+esc(c.chant+' – '+nomVoix(f)+(f.valide_par?' – validée par '+f.valide_par:' – à valider'))+'">'+(f.valide_par?'<span aria-label="validée">✓ </span>':'')+esc(nomVoix(f))+'</button>'}).join('')
+      +PUPITRES.filter(function(code){return !c.feuilles.some(function(f){return f.voix===code})}).map(function(code){
+        return '<button class="pastille manquante" style="--c:var(--v-'+code+')" data-creer="'+code+'" data-chant="'+esc(c.chant)+'" title="'+esc(VX[code].nom)+' : pas encore rédigée. Cliquer pour la créer à partir d’une feuille existante.">'+esc(VX[code].nom)+'</button>'}).join('')
       +'</span></li>';
   }).join('');
   if(e&&!e.id)html='<li class="chant-item actif"><span class="chant-nom">'+esc(e.chant||'Sans titre')+'</span><span class="pastilles"><span class="pastille actif" style="--c:var(--v-'+e.voix+')">Non enregistré</span></span></li>'+html;
   ul.innerHTML=html||'<li class="etiquette">Aucun chant'+(q?' ne correspond.':' pour l’instant.')+'</li>';
+  var lg=$('#legende-liste');if(lg)lg.innerHTML='<span>✓ feuille validée</span><span><span class="pastille manquante">Aigus</span> pas encore rédigée</span>';
 }
 function aideHTML(){
   return '<details><summary>Aide-mémoire de la notation</summary><dl class="aide">'
@@ -408,30 +426,47 @@ function aideHTML(){
    +'<dt><code>(texte)</code></dt><dd>ligne entre parenthèses : traduction, en italique discret.</dd>'
    +'<dt><code>==texte==</code></dt><dd>surligné.</dd><dt><code>~~texte~~</code></dt><dd>barré : passage que cette voix ne chante pas.</dd>'
    +'<dt><code>## Refrain</code></dt><dd>intitulé de section.</dd>'
+   +'<dt>Divisions</dt><dd>pour un pupitre divisé (Aigus 1 et Aigus 2…), utilisez « Diviser » ou le menu Division : chaque division a sa feuille.</dd>'
+   +'<dt>Validation</dt><dd>« Valider la transcription » marque la feuille comme relue (✓ dans la liste). Toute modification du texte retire la validation.</dd>'
    +'<dt><code>Ctrl</code>+<code>S</code></dt><dd>enregistrer tout de suite (l’enregistrement se fait aussi tout seul après quelques secondes).</dd></dl></details>';
 }
 function majEditeur(){
   var z=$('#editeur');if(!z)return;
   var e=S.ed;
   if(!e){z.innerHTML='<p class="vide-atelier">Choisissez une feuille dans la liste, ou créez un nouveau chant.</p>'+aideHTML();return}
-  var prises={};soeurs().forEach(function(f){prises[f.voix]=1});
-  var manquantes=VOIX.filter(function(v){return v.code!==e.voix&&!prises[v.code]});
+  var prises={},parVoix={};soeurs().forEach(function(f){prises[cleVoix(f)]=1;parVoix[f.voix]=Math.max(parVoix[f.voix]||0,+f.variante||1)});
+  var manquantes=VOIX.filter(function(v){return v.code!==e.voix&&!parVoix[v.code]});
+  var prochaine=Math.max(parVoix[e.voix]||0,+e.variante||1)+1;
+  var ancienne=$('#paroles'),garde=ancienne&&S.edAffiche===e?{h:ancienne.scrollTop,a:ancienne.selectionStart,b:ancienne.selectionEnd,f:document.activeElement===ancienne}:null;
   z.innerHTML='<div class="editeur">'
    +(S.conflit?'<div class="bandeau" role="alert"><span>'+esc(S.conflit.modifie_par)+' a modifié cette feuille pendant que vous écriviez.</span><button class="btn" data-a="conflit-charger">Charger sa version</button><button class="btn" data-a="conflit-garder">Garder la mienne</button></div>':'')
    +'<div class="champ"><label for="chant">Chant</label><input type="text" id="chant" value="'+esc(e.chant)+'"></div>'
+   +'<div id="validation"></div>'
    +'<div class="champ"><span class="etiquette" id="lbl-voix">Voix de cette feuille</span><div class="choix-voix" role="group" aria-labelledby="lbl-voix">'
-   +VOIX.map(function(v){return '<button type="button" class="'+(v.code==='U'?'unisson':'')+'"'+(v.code==='U'?'':' style="--c:var(--v-'+v.code+')"')+' data-voix="'+v.code+'" aria-pressed="'+(e.voix===v.code)+'"'+(prises[v.code]?' disabled title="Ce chant a déjà une feuille '+esc(v.nom)+'"':'')+'><i></i>'+esc(v.nom)+'</button>'}).join('')
+   +VOIX.map(function(v){var pris=prises[v.code+'|'+(e.variante||'')];return '<button type="button" class="'+(v.code==='U'?'unisson':'')+'"'+(v.code==='U'?'':' style="--c:var(--v-'+v.code+')"')+' data-voix="'+v.code+'" aria-pressed="'+(e.voix===v.code)+'"'+(pris?' disabled title="Ce chant a déjà une feuille '+esc(v.nom+(e.variante?' '+e.variante:''))+'"':'')+'><i></i>'+esc(v.nom)+'</button>'}).join('')
+   +'<label class="division">Division <select id="variante">'+['','1','2','3','4'].map(function(n){return '<option value="'+n+'"'+((e.variante||'')===n?' selected':'')+(prises[e.voix+'|'+n]?' disabled':'')+'>'+(n?nomVoix({voix:e.voix,variante:n}):'aucune')+'</option>'}).join('')+'</select></label>'
    +'</div></div>'
    +'<div class="outils" id="outils">'+outilsHTML()+'</div>'
    +'<div class="champ"><label for="paroles">Paroles</label><textarea id="paroles" spellcheck="false">'+esc(e.texte)+'</textarea></div>'
    +'<div class="actions"><button class="btn principal" data-a="enregistrer">Enregistrer</button>'
-   +(e.id?(S.confirmeSuppr?'<span>Supprimer la feuille '+esc(VX[e.voix].nom)+' ?</span><button class="btn danger" data-a="suppr-oui">Oui, supprimer</button><button class="btn" data-a="suppr-non">Annuler</button>':'<button class="btn danger" data-a="suppr">Supprimer cette feuille</button>'):'')
+   +(e.id?(S.confirmeSuppr?'<span>Supprimer la feuille '+esc(nomVoix(e))+' ?</span><button class="btn danger" data-a="suppr-oui">Oui, supprimer</button><button class="btn" data-a="suppr-non">Annuler</button>':'<button class="btn danger" data-a="suppr">Supprimer cette feuille</button>'):'')
    +'</div>'
-   +(manquantes.length?'<div class="declinaisons"><span class="etiquette">Créer à partir de cette feuille :</span>'+manquantes.map(function(v){return '<button class="pastille'+(v.code==='U'?' unisson':'')+'" style="--c:var(--v-'+v.code+')" data-decliner="'+v.code+'">'+esc(v.nom)+'</button>'}).join('')+'</div>':'')
+   +'<div class="declinaisons"><span class="etiquette">Créer à partir de cette feuille :</span>'+manquantes.map(function(v){return '<button class="pastille'+(v.code==='U'?' unisson':'')+'" style="--c:var(--v-'+v.code+')" data-decliner="'+v.code+'">'+esc(v.nom)+'</button>'}).join('')
+   +(e.voix!=='U'?'<button class="btn discret" data-a="diviser" data-n="'+prochaine+'">'+(e.variante?'+ '+esc(nomVoix({voix:e.voix,variante:String(prochaine)})):'Diviser en '+esc(nomVoix({voix:e.voix,variante:'1'}))+' et '+esc(nomVoix({voix:e.voix,variante:'2'})))+'</button>':'')+'</div>'
    +'<p class="statut" id="statut" role="status"></p>'
    +aideHTML()+'</div>';
-  afficherStatut();
+  S.edAffiche=e;
+  if(garde){var t=$('#paroles');t.scrollTop=garde.h;if(garde.f){t.focus({preventScroll:true});t.selectionStart=garde.a;t.selectionEnd=garde.b;t.scrollTop=garde.h}}
+  majValidation();afficherStatut();
 }
+function majValidation(){
+  var z=$('#validation'),e=S.ed;if(!z||!e)return;
+  if(!e.id){z.innerHTML='';return}
+  z.innerHTML=e.valide_par
+    ?'<div class="validation ok"><span><b>✓ Transcription validée</b> par '+esc(e.valide_par)+(e.valide_le?', le '+dateFr(e.valide_le):'')+'.'+(S.modifie?' <em>Vos modifications retireront la validation à l’enregistrement.</em>':'')+'</span><button class="btn discret" data-a="devalider">Retirer la validation</button></div>'
+    :'<div class="validation"><span>Transcription à valider.</span><button class="btn" data-a="valider">Valider la transcription</button></div>';
+}
+function dateFr(iso){var d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' à '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
 function outilsHTML(){
   var c=S.ed?S.ed.voix:'U';
   return '<button class="btn" data-ins="↑" title="La mélodie monte (Alt+↑)">↑ monte</button><button class="btn" data-ins="↓" title="La mélodie descend (Alt+↓)">↓ descend</button>'
@@ -445,14 +480,14 @@ function majApercu(){
   var cadre=$('#cadre'),info=$('#apercu-info');if(!cadre)return;
   var e=S.ed;
   if(!e){cadre.innerHTML='';cadre.style.height='0';info.textContent='';dernierRendu='';return}
-  var cle=JSON.stringify([e.chant,e.voix,e.texte,reglages]);
-  if(cle!==dernierRendu){
-    dernierRendu=cle;
+  var cle=JSON.stringify([e.chant,e.voix,e.variante,e.texte,reglages]);
+  if(cle+(e.valide_par||'')!==dernierRendu){
+    dernierRendu=cle+(e.valide_par||'');
     var F=FORMATS[reglages.format],r=mesurer(e,reglages.format);
     var hPage=F.h+(F.page==='A4'?26:14),wPage=F.w+(F.page==='A4'?28:14),marges=F.marge.split(' ');
     cadre.innerHTML='<div class="page-ecran" id="page-ecran">'+r.html.map(function(p,n){
       return '<div class="papier" style="width:'+wPage+'mm;height:'+hPage+'mm;padding:'+marges[0]+' '+marges[1]+'">'+p+(r.pages>1?'<span class="num">'+(n+1)+' / '+r.pages+'</span>':'')+'</div>'}).join('')+'</div>';
-    info.innerHTML=F.nom+' · '+(r.pages===1?'<b>tient sur 1 page</b>':'<b>'+r.pages+' pages</b>')+(F.ajuster?' · '+(r.cols===2?'2 colonnes · ':'')+'texte en '+String(r.fs).replace('.',',')+' pt':'');
+    info.innerHTML=(e.id?(e.valide_par?'<span class="ok">✓ validée</span> · ':'<span>à valider</span> · '):'')+F.nom+' · '+(r.pages===1?'<b>tient sur 1 page</b>':'<b>'+r.pages+' pages</b>')+(F.ajuster?' · '+(r.cols===2?'2 colonnes · ':'')+'texte en '+String(r.fs).replace('.',',')+' pt':'');
   }
   echelle();
 }
@@ -487,7 +522,7 @@ function charger(silencieux){
   });
 }
 function trouver(id){return S.feuilles.filter(function(f){return f.id===id})[0]}
-function copie(f){return {id:f.id,chant:f.chant,chantInitial:f.chant,voix:f.voix,texte:f.texte,version:f.version}}
+function copie(f){return {id:f.id,chant:f.chant,chantInitial:f.chant,voix:f.voix,variante:f.variante||'',texte:f.texte,version:f.version,valide_par:f.valide_par||'',valide_le:f.valide_le||''}}
 function ouvrir(id,force){
   var suite=function(){
     var f=trouver(id);if(!f)return;
@@ -498,7 +533,8 @@ function ouvrir(id,force){
   if(S.modifie&&!force)sauver().then(function(ok){if(ok)suite()});else suite();
 }
 function modifier(){
-  S.modifie=true;ecrire('chorale-brouillon',S.ed);
+  var avant=S.modifie;S.modifie=true;ecrire('chorale-brouillon',S.ed);
+  if(!avant&&S.ed.valide_par)majValidation();
   statut('Modifications en cours…');
   clearTimeout(minuterie);minuterie=setTimeout(function(){sauver()},2500);
   majApercu();
@@ -510,29 +546,29 @@ function sauver(forcer){
   if(S.conflit&&!forcer)return Promise.resolve(false);
   if(S.enCours){S.encore=true;return Promise.resolve(false)}
   S.enCours=true;statut('Enregistrement…');
-  var envoi={id:e.id,chant:e.chant.trim()||'Sans titre',voix:e.voix,texte:e.texte,version:e.version};
+  var envoi={id:e.id,chant:e.chant.trim()||'Sans titre',voix:e.voix,variante:e.variante||'',texte:e.texte,version:e.version};
   var ancienNom=e.chantInitial,aRenommer=e.id?soeurs():[];
   return api('enregistrer',{feuille:envoi,forcer:!!forcer}).then(function(r){
     S.enCours=false;
     if(!r.ok){
       if(r.erreur==='conflit'){S.conflit=r.feuille;majEditeur();statut('Rien n’a été écrasé : choisissez quelle version garder.','err');return false}
-      if(r.erreur==='doublon'){statut('Ce chant a déjà une feuille '+VX[e.voix].nom+'. Choisissez une autre voix ou un autre titre.','err');return false}
+      if(r.erreur==='doublon'){statut('Ce chant a déjà une feuille '+nomVoix(e)+'. Choisissez une autre voix, une autre division ou un autre titre.','err');return false}
       statut(messageErreur(r),'err');return false;
     }
     var f=r.feuille,i=S.feuilles.map(function(x){return x.id}).indexOf(f.id);
     if(i>=0)S.feuilles[i]=f;else S.feuilles.push(f);
-    var inchange=e.texte===envoi.texte&&e.voix===envoi.voix&&e.chant.trim()===envoi.chant;
-    e.id=f.id;e.version=f.version;e.chantInitial=f.chant;
+    var inchange=e.texte===envoi.texte&&e.voix===envoi.voix&&(e.variante||'')===envoi.variante&&e.chant.trim()===envoi.chant;
+    e.id=f.id;e.version=f.version;e.chantInitial=f.chant;e.valide_par=f.valide_par||'';e.valide_le=f.valide_le||'';
     if(inchange){S.modifie=false;ecrire('chorale-brouillon',null)}
     ecrire('chorale-ouverte',f.id);
     var suite=Promise.resolve();
     if(ancienNom&&ancienNom!==f.chant)aRenommer.forEach(function(s){
-      suite=suite.then(function(){return api('enregistrer',{feuille:{id:s.id,chant:f.chant,voix:s.voix,texte:s.texte,version:s.version}}).then(function(r2){
+      suite=suite.then(function(){return api('enregistrer',{feuille:{id:s.id,chant:f.chant,voix:s.voix,variante:s.variante||'',texte:s.texte,version:s.version}}).then(function(r2){
         if(r2.ok){var j=S.feuilles.map(function(x){return x.id}).indexOf(s.id);if(j>=0)S.feuilles[j]=r2.feuille}
       })});
     });
     return suite.then(function(){
-      majListe();
+      majListe();majValidation();majApercu();
       if(document.activeElement&&document.activeElement.id!=='paroles'&&document.activeElement.id!=='chant')majEditeur();
       statut(S.modifie?'Modifications en cours…':infoEnregistre(f),S.modifie?'':'ok');
       if(S.encore){S.encore=false;return sauver()}
@@ -541,24 +577,34 @@ function sauver(forcer){
     });
   },function(err){S.enCours=false;statut(messageErreur(err)+' Vos modifications sont gardées sur cet ordinateur.','err');return false});
 }
-function nouvelle(chant,voix,texte){
-  S.ed={id:null,chant:chant,chantInitial:null,voix:voix,texte:texte,version:0};
+function nouvelle(chant,voix,texte,variante){
+  S.ed={id:null,chant:chant,chantInitial:null,voix:voix,variante:variante||'',texte:texte,version:0,valide_par:'',valide_le:''};
   S.conflit=null;S.confirmeSuppr=false;
+}
+/* Insertion au curseur sans faire sauter la zone de saisie (et en gardant Ctrl+Z) */
+function placer(t,debut,fin,txt){
+  var haut=t.scrollTop;
+  t.focus({preventScroll:true});
+  t.setSelectionRange(debut,fin);
+  var ok=false;try{ok=document.execCommand('insertText',false,txt)}catch(e){}
+  if(!ok)t.setRangeText(txt,debut,fin,'end');
+  t.scrollTop=haut;
 }
 function inserer(avant,apres){
   var t=$('#paroles');if(!t)return;
-  var a=t.selectionStart,b=t.selectionEnd,v=t.value,sel=v.slice(a,b);
-  t.value=v.slice(0,a)+avant+sel+apres+v.slice(b);
-  t.focus();t.selectionStart=a+avant.length;t.selectionEnd=a+avant.length+sel.length;
+  var a=t.selectionStart,b=t.selectionEnd,sel=t.value.slice(a,b),haut=t.scrollTop;
+  placer(t,a,b,avant+sel+apres);
+  t.setSelectionRange(a+avant.length,a+avant.length+sel.length);t.scrollTop=haut;
   S.ed.texte=t.value;modifier();
 }
 function debutLigne(prefixe){
   var t=$('#paroles');if(!t)return;
-  var a=t.selectionStart,v=t.value,d=v.lastIndexOf('\n',a-1)+1;
-  t.value=v.slice(0,d)+prefixe+v.slice(d);t.focus();t.selectionStart=t.selectionEnd=a+prefixe.length;
+  var a=t.selectionStart,d=t.value.lastIndexOf('\n',a-1)+1,haut=t.scrollTop;
+  placer(t,d,d,prefixe);
+  t.setSelectionRange(a+prefixe.length,a+prefixe.length);t.scrollTop=haut;
   S.ed.texte=t.value;modifier();
 }
-function nomFichier(f,tout){return (f.chant||'Fiche')+(tout?'':' – '+VX[f.voix].nom)}
+function nomFichier(f,tout){return (f.chant||'Fiche')+(tout?'':' – '+nomVoix(f))}
 
 document.addEventListener('submit',function(ev){
   if(ev.target.id!=='f-connexion')return;ev.preventDefault();
@@ -574,16 +620,49 @@ document.addEventListener('click',function(ev){
   if(b.dataset.ins!==undefined){inserer(b.dataset.ins,'');return}
   if(b.dataset.env!==undefined){var p=b.dataset.env.split('|');inserer(p[0],p[1]);return}
   if(b.dataset.ligne!==undefined){debutLigne(b.dataset.ligne);return}
-  if(b.dataset.voix){S.ed.voix=b.dataset.voix;majEditeur();modifier();return}
+  if(b.dataset.voix){S.ed.voix=b.dataset.voix;if(b.dataset.voix==='U')S.ed.variante='';majEditeur();modifier();return}
+  if(b.dataset.creer){
+    var nomChant=b.dataset.chant,code=b.dataset.creer;
+    sauver().then(function(ok){
+      if(!ok&&S.modifie)return;
+      var grp=chants().filter(function(c){return c.chant===nomChant})[0];if(!grp)return;
+      var src=S.ed&&S.ed.id&&S.ed.chantInitial===nomChant?S.ed:grp.feuilles[0];
+      nouvelle(nomChant,code,src.texte,'');S.ed.chantInitial=nomChant;S.modifie=true;
+      majListe();majEditeur();majApercu();
+      sauver().then(function(ok2){majListe();majEditeur();if(ok2)statut('Feuille '+VX[code].nom+' créée à partir de la feuille '+nomVoix(src)+' : ajustez les passages harmonisés.','ok')});
+    });return;
+  }
   if(b.dataset.decliner){
     var e=S.ed,v=b.dataset.decliner;
     sauver().then(function(ok){
       if(!ok&&S.modifie)return;
-      nouvelle(e.chant,v,e.texte);S.ed.chantInitial=e.chant;S.modifie=true;
+      nouvelle(e.chant,v,e.texte,'');S.ed.chantInitial=e.chant;S.modifie=true;
       majListe();majEditeur();majApercu();sauver(false).then(function(){majListe();majEditeur()});
     });return;
   }
   var a=b.dataset.a;
+  if(a==='diviser'){
+    var d0=S.ed,n=b.dataset.n;
+    if(!d0.variante){d0.variante='1';S.modifie=true}
+    sauver().then(function(ok){
+      if(!ok&&S.modifie)return;
+      nouvelle(d0.chant,d0.voix,d0.texte,n);S.ed.chantInitial=d0.chant;S.modifie=true;
+      majListe();majEditeur();majApercu();sauver().then(function(){majListe();majEditeur()});
+    });return;
+  }
+  if(a==='valider'||a==='devalider'){
+    sauver().then(function(ok){
+      if(!ok&&S.modifie)return;
+      var e=S.ed;
+      api('valider',{id:e.id,version:e.version,annuler:a==='devalider'}).then(function(r){
+        if(!r.ok){if(r.erreur==='conflit'){S.conflit=r.feuille;majEditeur();statut('La feuille a été modifiée entre-temps : vérifiez-la avant de la valider.','err')}else statut(messageErreur(r),'err');return}
+        var f=r.feuille,i=S.feuilles.map(function(x){return x.id}).indexOf(f.id);if(i>=0)S.feuilles[i]=f;
+        if(S.ed&&S.ed.id===f.id){S.ed.version=f.version;S.ed.valide_par=f.valide_par;S.ed.valide_le=f.valide_le}
+        majListe();majValidation();majApercu();
+        statut(a==='valider'?'Transcription validée.':'Validation retirée.','ok');
+      },function(err){statut(messageErreur(err),'err')});
+    });return;
+  }
   if(a==='enregistrer'){sauver(false).then(function(){S.modifie||statut(infoEnregistre(trouver(S.ed&&S.ed.id)),'ok')});return}
   if(a==='nouveau'){sauver().then(function(ok){if(!ok&&S.modifie)return;nouvelle('Nouveau chant','U','');S.modifie=false;majListe();majEditeur();majApercu();statut('Donnez un titre, puis écrivez les paroles : la feuille s’enregistre toute seule.');var c=$('#chant');c.focus();c.select()});return}
   if(a==='actualiser'){sauver().then(function(){return charger()}).catch(function(e){statut(messageErreur(e),'err')});return}
@@ -606,7 +685,7 @@ document.addEventListener('click',function(ev){
   if(a==='pdf-feuille'){if(!S.ed){statut('Ouvrez d’abord une feuille.','err');return}imprimer([S.ed],nomFichier(S.ed));return}
   if(a==='pdf-chant'){
     if(!S.ed){statut('Ouvrez d’abord une feuille.','err');return}
-    var lot=[S.ed].concat(soeurs()).sort(function(x,y){return VX[x.voix].ordre-VX[y.voix].ordre});
+    var lot=[S.ed].concat(soeurs()).sort(ordreF);
     imprimer(lot,nomFichier(S.ed,true));return;
   }
 });
@@ -620,6 +699,7 @@ document.addEventListener('change',function(ev){
   var t=ev.target;
   if(t.id==='format'||t.id==='montees'||t.id==='colonnes'){reglages[t.id]=t.value;ecrire('chorale-reglages',reglages);majApercu()}
   if(t.id==='chant'&&S.ed){majListe()}
+  if(t.id==='variante'&&S.ed){S.ed.variante=t.value;majEditeur();modifier()}
 });
 document.addEventListener('keydown',function(ev){
   if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'&&S.ed){ev.preventDefault();sauver(false);return}

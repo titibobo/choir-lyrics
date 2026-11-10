@@ -51,6 +51,9 @@ Atelier de rédaction des fiches de paroles de la chorale. Les rédacteurs y éc
 ## Au quotidien
 
 - **Enregistrement :** il se fait tout seul quelques secondes après la dernière frappe. `Ctrl+S` force l'enregistrement.
+- **Voix manquantes :** dans la liste, les pupitres pas encore rédigés (Graves, Medium graves, Medium aigus, Aigus) apparaissent en pointillés. Un clic crée la feuille à partir d'une feuille existante du chant.
+- **Pupitre divisé :** « Diviser en Aigus 1 et Aigus 2 » (ou le menu **Division**) donne une feuille à chaque division.
+- **Validation :** « Valider la transcription » marque la feuille comme relue, avec le nom de la personne et la date, et un ✓ apparaît dans la liste. Toute modification du texte retire la validation. Un simple changement de titre la conserve.
 - **Une feuille par voix :** les pastilles « Créer à partir de cette feuille » recopient le texte vers une autre voix. Il ne reste qu'à ajuster les passages `H:`.
 - **Export PDF :** clique sur **PDF de cette voix** ou **PDF de toutes les voix**, puis choisis **Enregistrer au format PDF** dans la fenêtre d'impression.
   - Utilise Chrome ou Edge.
