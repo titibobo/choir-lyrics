@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fiches de chant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&display=swap">
+<script>
+/* ===== Réglage : collez ici l'adresse de l'application Web Apps Script (se termine par /exec) ===== */
+var ADRESSE_SERVICE = '';
+</script>
+<style>
+/* Atelier de rédaction : bibliothèque à gauche, saisie au centre, page imprimée à droite (empilés sur petit écran).
+   La feuille (« .fiche ») a sa propre palette fixe : c'est du papier, identique à l'écran et au PDF. */
+:root{
+  --fond:#f6f5f9; --surface:#ffffff; --encre:#1d1a26; --discret:#676177; --trait:#dcd8e6; --fond2:#eeebf4;
+  --accent:#5b2bc4; --sur-accent:#ffffff; --alerte:#b3261e; --ok:#1f7a3a; --survol:#e6e0f5;
+  --titre:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --texte:"Atkinson Hyperlegible",Verdana,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  /* Pupitres (couleurs du papier) */
+  --v-U:#17141f; --v-G:#1f7a3a; --v-MG:#d06400; --v-MA:#c8202a; --v-A:#6a2bd6;
+  --papier:#ffffff; --papier-encre:#17141f; --papier-discret:#6b6578; --papier-surligne:#ece4ff;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --fond:#141219; --surface:#1d1a24; --encre:#ece8f5; --discret:#a39db2; --trait:#34303f; --fond2:#25212e;
+  --accent:#b49bff; --sur-accent:#1b1230; --alerte:#ff8a80; --ok:#7fd69a; --survol:#2e2840;
+  color-scheme:dark } }
+:root[data-theme="dark"]{
+  --fond:#141219; --surface:#1d1a24; --encre:#ece8f5; --discret:#a39db2; --trait:#34303f; --fond2:#25212e;
+  --accent:#b49bff; --sur-accent:#1b1230; --alerte:#ff8a80; --ok:#7fd69a; --survol:#2e2840;
+  color-scheme:dark }
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--fond);color:var(--encre);font:15px/1.5 var(--texte)}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+
+.btn{background:var(--fond2);border:1px solid var(--trait);border-radius:6px;padding:.4rem .75rem;cursor:pointer;line-height:1.3}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.principal{background:var(--accent);border-color:var(--accent);color:var(--sur-accent);font-weight:700}
+.btn.danger{color:var(--alerte)}
+.btn.discret{background:none;border-color:transparent;color:var(--discret)}
+input[type=text],input[type=password],select{background:var(--surface);border:1px solid var(--trait);border-radius:6px;padding:.4rem .6rem}
+
+/* ---------- Barre du haut ---------- */
+.haut{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.6rem 16px;background:var(--surface);border-bottom:1px solid var(--trait)}
+.marque{font-family:var(--titre);font-weight:700;font-size:1.1rem;margin:0;margin-right:auto;display:flex;align-items:center;gap:.5rem}
+.marque .portee{display:inline-flex;gap:3px;align-items:flex-end;height:1.1rem}
+.marque .portee i{width:4px;border-radius:2px;display:block}
+.export{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.export label{font-size:.8rem;color:var(--discret)}
+.qui{font-size:.85rem;color:var(--discret);display:flex;gap:.4rem;align-items:center}
+
+/* ---------- Atelier ---------- */
+.atelier{display:grid;grid-template-columns:15rem minmax(0,1fr) minmax(0,1fr);gap:1rem;padding:1rem 16px 3rem;align-items:start}
+@media (max-width:1150px){ .atelier{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .biblio{grid-column:1 / -1} }
+@media (max-width:760px){ .atelier{grid-template-columns:minmax(0,1fr)} }
+.panneau{background:var(--surface);border:1px solid var(--trait);border-radius:10px;padding:.9rem;min-width:0}
+.panneau h2{font-family:var(--titre);font-size:.78rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--discret);margin:0 0 .6rem}
+
+/* Bibliothèque */
+.biblio ul{list-style:none;margin:0 0 .75rem;padding:0;display:flex;flex-direction:column;gap:.15rem;max-height:70vh;overflow:auto}
+@media (max-width:1150px){ .biblio ul{max-height:14rem} }
+.chant-item{padding:.4rem .45rem;border-radius:6px}
+.chant-item.actif{background:var(--survol)}
+.chant-nom{display:block;font-weight:700;font-size:.92rem;line-height:1.25;margin-bottom:.3rem;overflow-wrap:anywhere}
+.pastilles{display:flex;flex-wrap:wrap;gap:.25rem}
+.pastille{border:0;border-radius:999px;padding:.12rem .5rem;font-size:.75rem;font-weight:700;color:#fff;background:var(--c);cursor:pointer;opacity:.9}
+.pastille.unisson{background:var(--fond2);color:var(--encre);border:1px solid var(--trait)}
+.pastille.actif{outline:2px solid var(--encre);outline-offset:1px;opacity:1}
+.recherche{width:100%;margin-bottom:.6rem}
+
+/* Éditeur */
+.editeur{display:flex;flex-direction:column;gap:.75rem}
+.champ{display:flex;flex-direction:column;gap:.25rem}
+.champ > label,.etiquette{font-size:.8rem;color:var(--discret)}
+#chant{font-family:var(--titre);font-weight:700;font-size:1.1rem}
+.choix-voix{display:flex;flex-wrap:wrap;gap:.35rem}
+.choix-voix button{border:2px solid var(--c);background:var(--surface);color:var(--encre);border-radius:999px;padding:.25rem .7rem;font-size:.85rem;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem}
+.choix-voix button i{width:.65rem;height:.65rem;border-radius:50%;background:var(--c)}
+.choix-voix button[aria-pressed="true"]{background:var(--c);color:#fff;font-weight:700}
+.choix-voix button[aria-pressed="true"] i{background:#fff}
+.choix-voix button.unisson{--c:var(--encre)}
+.choix-voix button.unisson[aria-pressed="true"]{color:var(--surface)}
+.choix-voix button.unisson[aria-pressed="true"] i{background:var(--surface)}
+.choix-voix button:disabled{opacity:.35;cursor:not-allowed}
+.outils{display:flex;flex-wrap:wrap;gap:.3rem}
+.outils .btn{padding:.25rem .55rem;font-size:.88rem}
+.outils .harmo-btn{color:var(--c);font-weight:700;border-color:var(--c)}
+textarea{width:100%;min-height:26rem;resize:vertical;background:var(--surface);border:1px solid var(--trait);border-radius:6px;padding:.7rem;font:.92rem/1.6 var(--mono);tab-size:2}
+.actions{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
+.declinaisons{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;font-size:.85rem}
+.statut{font-size:.88rem;color:var(--discret);margin:0;min-height:1.3em}
+.statut.err{color:var(--alerte)}
+.statut.ok{color:var(--ok)}
+.bandeau{border:1px solid var(--alerte);border-radius:8px;padding:.6rem .75rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;font-size:.9rem}
+details{border:1px solid var(--trait);border-radius:8px;padding:.5rem .7rem}
+summary{cursor:pointer;font-size:.9rem}
+.aide{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem 1rem;margin:.6rem 0 .2rem;font-size:.88rem}
+.aide dt,.aide dd{margin:0}
+.aide code{font-family:var(--mono);background:var(--fond2);padding:.05rem .35rem;border-radius:4px;white-space:nowrap}
+.vide-atelier{color:var(--discret);text-align:center;padding:3rem 1rem}
+
+/* Aperçu */
+.apercu-info{font-size:.85rem;color:var(--discret);margin:0 0 .6rem;font-variant-numeric:tabular-nums}
+.apercu-info b{color:var(--encre)}
+.cadre{overflow:hidden;position:relative}
+.page-ecran{transform-origin:top left;position:absolute;left:0;top:0;display:flex;flex-direction:column;gap:8mm}
+.papier{background:var(--papier);box-shadow:0 1px 3px rgba(20,10,40,.18),0 6px 24px rgba(20,10,40,.10);position:relative;overflow:hidden}
+.papier .num{position:absolute;right:5mm;bottom:3mm;font:8pt var(--texte);color:#9a93a9}
+
+/* Connexion */
+.connexion{max-width:24rem;margin:12vh auto 0;padding-inline:16px}
+.connexion form{display:flex;flex-direction:column;gap:.75rem}
+.connexion h1{font-family:var(--titre);font-size:1.6rem;margin:0}
+.connexion p{margin:0;color:var(--discret)}
+
+/* ---------- La fiche : papier ---------- */
+.fiche{--fs:13pt;font-family:var(--texte);font-size:var(--fs);color:var(--papier-encre);background:var(--papier);text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.fiche-tete{margin-bottom:.9em}
+.fiche-tete h1{font-family:var(--titre);font-weight:700;font-size:1.55em;line-height:1.15;margin:0 0 .3em;text-wrap:balance}
+.fiche-voix{display:inline-flex;align-items:center;gap:.45em;margin:0;font-size:.78em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--harmo)}
+.fiche-voix i{width:.75em;height:.75em;border-radius:50%;background:var(--harmo)}
+.fiche-voix.unisson{color:var(--papier-discret)}
+.paroles{line-height:1.55}
+.colonnes{display:grid;grid-template-columns:minmax(0,1fr);align-items:start}
+.colonnes.n2{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:7mm;background:linear-gradient(#e2deea,#e2deea) center top/.5pt 100% no-repeat}
+.ligne{margin:0;overflow-wrap:anywhere;break-inside:avoid}
+.ligne.trad{font-style:italic;font-size:.88em;color:var(--papier-discret)}
+.vide{height:.9em}
+.section{margin:.25em 0 .2em;font-family:var(--titre);font-size:.7em;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--papier-discret);break-after:avoid}
+.harmo{color:var(--harmo)}
+.uni{color:var(--papier-encre)}
+.tenu{border-bottom:.11em solid currentColor;letter-spacing:.06em}
+.app{font-weight:700}
+mark{background:var(--papier-surligne);color:inherit;border-radius:.2em;padding:0 .15em}
+.fl{width:1em;height:1em;vertical-align:-.15em;margin-inline:.06em}
+.paroles.mots{line-height:var(--haut,1.55)}
+.mots .avec .pt{display:none}
+.mots .avec .niv{position:relative;top:calc((var(--mid) - var(--n)) * var(--pas))}
+.mots .avec mark{background:none;padding:0}
+.mots .avec mark .niv{background:var(--papier-surligne);border-radius:.2em}
+.mots .avec s{text-decoration:none}
+.mots .avec s .niv{text-decoration:line-through}
+
+/* ---------- Impression ---------- */
+#mesure{position:absolute;left:-10000px;top:0;visibility:hidden}
+#impression{display:none}
+@media print{
+  body{background:#fff}
+  body > :not(#impression){display:none!important}
+  #impression{display:block}
+  .page-imp{break-after:page}
+  .page-imp:last-child{break-after:auto}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="mesure" aria-hidden="true"></div>
+<div id="impression"></div>
+<style id="style-page"></style>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= Notation ================= */
+var VOIX=[
+  {code:'U', nom:'Unisson'},
+  {code:'G', nom:'Graves'},
+  {code:'MG',nom:'Medium graves'},
+  {code:'MA',nom:'Medium aigus'},
+  {code:'A', nom:'Aigus'}
+];
+var VX={};VOIX.forEach(function(v,i){v.ordre=i;VX[v.code]=v});
+var HARMO={H:1,G:1,MG:1,MA:1,A:1};
+
+var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+function tenue(w){return w.replace(/(\p{L})\1{2,}/giu,function(m){var c=Array.from(m);return c[0]+'<span class="tenu">'+c.slice(1).join('')+'</span>'})}
+function mot(w){
+  if(/\p{Ll}/u.test(w)&&/\p{Lu}{2,}/u.test(w))
+    return w.split(/(\p{Lu}{2,})/u).map(function(p,i){return i%2?'<b class="app">'+tenue(p)+'</b>':tenue(p)}).join('');
+  return tenue(w);
+}
+function mots(s){var o='',i=0;s.replace(/\p{L}+/gu,function(w,pos){o+=esc(s.slice(i,pos))+mot(w);i=pos+w.length;return w});return o+esc(s.slice(i))}
+function fleche(haut){
+  return '<span class="pt">'+(haut
+   ? '<svg class="fl" viewBox="0 0 16 16" role="img" aria-label="monte"><circle cx="8" cy="8" r="7.25" fill="currentColor"/><path d="M8 12V4.6M4.8 7.7 8 4.5l3.2 3.2" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+   : '<svg class="fl" viewBox="0 0 16 16" role="img" aria-label="descend"><circle cx="8" cy="8" r="7.25" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M8 4v7.4M4.8 8.3 8 11.5l3.2-3.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>')+'</span>';
+}
+var niv={n:0,min:0,max:0};
+function seg(t){return t?'<span class="niv" style="--n:'+niv.n+'">'+mots(t)+'</span>':''}
+function texte(s){
+  var o='',i=0,re=/([⬆↑↗^])️?|([⬇↓↘])️?/gu,m;
+  while((m=re.exec(s))){
+    o+=seg(s.slice(i,m.index))+fleche(!!m[1]);i=m.index+m[0].length;
+    niv.n+=m[1]?1:-1;niv.min=Math.min(niv.min,niv.n);niv.max=Math.max(niv.max,niv.n);
+  }
+  return o+seg(s.slice(i));
+}
+function enLigne(s){
+  var o='',i=0,re=/\[(\p{L}{1,3})\s*:\s*([^\]]*)\]|==(.+?)==|~~(.+?)~~|\*(.+?)\*/gu;
+  Array.from(s.matchAll(re)).forEach(function(m){
+    o+=texte(s.slice(i,m.index));i=m.index+m[0].length;
+    if(m[1]!==undefined){
+      var c=m[1].toUpperCase();
+      if(c==='U')o+='<span class="uni">'+enLigne(m[2])+'</span>';
+      else if(HARMO[c])o+='<span class="harmo">'+enLigne(m[2])+'</span>';
+      else o+=texte(m[0]);
+    }
+    else if(m[3]!==undefined)o+='<mark>'+enLigne(m[3])+'</mark>';
+    else if(m[4]!==undefined)o+='<s>'+enLigne(m[4])+'</s>';
+    else o+='<b class="app">'+enLigne(m[5])+'</b>';
+  });
+  return o+texte(s.slice(i));
+}
+function rendre(src){
+  var bloc=false,o='',E=0;
+  String(src||'').split('\n').forEach(function(l0){
+    var l=l0.trim();
+    if(!l){bloc=false;o+='<div class="vide"></div>';return}
+    if(l.indexOf('##')===0){o+='<p class="section">'+esc(l.replace(/^#+\s*/,''))+'</p>';return}
+    var h=bloc,t=l,m=l.match(/^(\p{L}{1,3})\s*:\s*(.*)$/u);
+    if(m){var c=m[1].toUpperCase();
+      if(c==='U'||HARMO[c]){var hh=c!=='U';if(!m[2]){bloc=hh;return}h=hh;t=m[2]}}
+    niv={n:0,min:0,max:0};
+    var html=enLigne(t),avec=html.indexOf('class="pt"')>=0;E=Math.max(E,niv.max-niv.min);
+    o+='<p dir="auto" class="ligne'+(h?' harmo':'')+(/^\(.*\)$/.test(t)?' trad':'')+(avec?' avec':'')+'"'+(avec?' style="--mid:'+((niv.max+niv.min)/2)+'"':'')+'>'+html+'</p>';
+  });
+  var pas=Math.min(.28,.6/Math.max(1,E));
+  return {html:o,style:E?'--pas:'+pas.toFixed(3)+'em;--haut:'+(1.55+E*pas).toFixed(3)+'em':''};
+}
+function ficheHTML(f,fs){
+  var v=VX[f.voix]||VX.U,r=rendre(f.texte);
+  return '<article class="fiche" style="--harmo:var(--v-'+v.code+');'+(fs?'--fs:'+fs+'pt':'')+'">'
+    +'<header class="fiche-tete"><h1>'+esc(f.chant||'Sans titre')+'</h1>'
+    +'<p class="fiche-voix'+(v.code==='U'?' unisson':'')+'"><i></i>'+esc(v.nom)+'</p></header>'
+    +'<div class="paroles'+(reglages.montees==='fleches'?'':' mots')+'" style="'+r.style+'">'+r.html+'</div></article>';
+}
+
+/* ================= Mise en page ================= */
+var FORMATS={
+  a4:{nom:'A4',page:'A4',marge:'13mm 14mm',w:182,h:271,ajuster:true},
+  tel:{nom:'Téléphone',page:'100mm 178mm',marge:'7mm 7mm',w:86,h:164,ajuster:false,fs:12.5}
+};
+var PXMM=96/25.4;
+/* Découpe la fiche en pages et en colonnes, vers par vers : l'aperçu et le PDF utilisent exactement ce découpage. */
+var GOUTTIERE=7;
+function paginer(f,format,fs,cols){
+  var F=FORMATS[format],m=document.getElementById('mesure');
+  var colw=cols===2?(F.w-GOUTTIERE)/2:F.w;
+  m.style.width=F.w+'mm';
+  m.innerHTML=ficheHTML(f,fs);
+  var art=m.firstChild,tete=art.querySelector('.fiche-tete'),par=art.querySelector('.paroles');
+  par.style.width=colw+'mm';par.style.position='relative';par.style.margin='0 auto';
+  var lh=parseFloat(getComputedStyle(par).lineHeight),items=Array.from(par.children),fin=par.scrollHeight,coupes=0;
+  var h=items.map(function(it,k){var b=k+1<items.length?items[k+1].offsetTop:fin;return b-it.offsetTop});
+  items.forEach(function(it,k){if(it.classList.contains('ligne')&&h[k]>lh*1.4)coupes++});
+  var cap=F.h*PXMM-2,capTete=cap-par.offsetTop;
+  var pages=[[[]]],used=0,pc=pages[0],col=pc[0];
+  var nouvelleColonne=function(){
+    if(pc.length<cols){col=[];pc.push(col)}else{pc=[[]];pages.push(pc);col=pc[0]}
+    used=0;
+  };
+  var capacite=function(){return pages.length===1?capTete:cap};
+  for(var k=0;k<items.length;k++){
+    var it=items[k],estVide=it.classList.contains('vide'),estSection=it.classList.contains('section');
+    if(estVide&&!col.length)continue;
+    var besoin=h[k]+(estSection&&k+1<items.length?h[k+1]:0);
+    if(col.length&&used+besoin>capacite())nouvelleColonne();
+    if(estVide&&!col.length)continue;
+    col.push(it.outerHTML);used+=h[k];
+  }
+  var style=par.getAttribute('style')||'',teteHTML=tete.outerHTML,classe=par.className;
+  var v=VX[f.voix]||VX.U;
+  var html=pages.map(function(pg,n){
+    while(pg.length<cols)pg.push([]);
+    return '<article class="fiche" style="--harmo:var(--v-'+v.code+');--fs:'+fs+'pt">'+(n===0?teteHTML:'')
+      +'<div class="colonnes'+(cols===2?' n2':'')+'">'+pg.map(function(c){return '<div class="'+classe+'" style="'+style.replace(/width:[^;]+;?|position:[^;]+;?|margin:[^;]+;?/g,'')+'">'+c.join('')+'</div>'}).join('')+'</div></article>';
+  });
+  m.innerHTML='';
+  return {fs:fs,cols:cols,pages:pages.length,coupes:coupes,html:html};
+}
+function mesurer(f,format){
+  /* Cherche la plus grande taille de texte qui tient sur le moins de pages possible.
+     A4 en automatique : pour 1 page, puis 2…, compare 1 colonne (15 → 10 pt) et 2 colonnes (13 → 10 pt). */
+  var F=FORMATS[format],cache={};
+  var essai=function(fs,cols){var k=fs+'/'+cols;return cache[k]||(cache[k]=paginer(f,format,fs,cols))};
+  /* on évite les tailles qui coupent des vers en deux, au-delà de ceux qui le sont déjà à la plus petite taille */
+  var chercher=function(cols,n,haut,bas){
+    var mini=essai(bas,cols).coupes;
+    for(var x=haut;x>=bas;x-=.5){var r=essai(x,cols);if(r.pages<=n&&r.coupes<=mini+3)return r}
+    return null;
+  };
+  var res=null,c=reglages.colonnes;
+  if(!F.ajuster)res=essai(F.fs,1);
+  else if(c==='1'){res=chercher(1,1,15,9);for(var n=2;n<=6&&!res;n++)res=chercher(1,n,15,10)}
+  else if(c==='2'){for(var n2=1;n2<=4&&!res;n2++)res=chercher(2,n2,13,10)}
+  else for(var n3=1;n3<=6&&!res;n3++){
+    var a=chercher(1,n3,15,10),b=chercher(2,n3,13,10);
+    res=a&&(!b||a.fs>=b.fs-1)?a:b; /* à une taille près, on préfère une seule colonne */
+  }
+  return res||essai(10,c==='2'?2:1);
+}
+function imprimer(feuilles,nomFichier){
+  var F=FORMATS[reglages.format];
+  var html=feuilles.map(function(f){return mesurer(f,reglages.format).html.map(function(p){return '<div class="page-imp" style="width:'+F.w+'mm">'+p+'</div>'}).join('')}).join('');
+  document.getElementById('impression').innerHTML=html;
+  document.getElementById('style-page').textContent='@page{size:'+F.page+';margin:'+F.marge+'}';
+  var titre=document.title;document.title=nomFichier;
+  var fin=function(){document.title=titre;window.removeEventListener('afterprint',fin)};
+  window.addEventListener('afterprint',fin);
+  setTimeout(function(){window.print();setTimeout(fin,1500)},60);
+}
+
+/* ================= État ================= */
+var $=function(s){return document.querySelector(s)};
+var app=$('#app');
+function lire(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function ecrire(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+var reglages=Object.assign({format:'a4',montees:'mots',colonnes:'auto'},lire('chorale-reglages')||{});
+var S={code:lire('chorale-code')||'',nom:'',feuilles:[],ed:null,modifie:false,enCours:false,encore:false,
+       conflit:null,confirmeSuppr:false,filtre:'',statut:{t:'',k:''}};
+var minuterie=0;
+
+/* ================= Service ================= */
+function api(action,extra){
+  if(!ADRESSE_SERVICE)return Promise.reject({erreur:'config'});
+  return fetch(ADRESSE_SERVICE,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({action:action,code:S.code},extra||{}))})
+    .then(function(r){if(!r.ok)throw {erreur:'reseau'};return r.json()},function(){throw {erreur:'reseau'}})
+    .then(function(r){if(!r.ok&&r.erreur==='code'){deconnecter('Code inconnu. Vérifiez-le, ou demandez-en un à la personne qui gère le tableau.');throw r}return r});
+}
+function messageErreur(e){
+  var k=e&&e.erreur;
+  if(k==='config')return 'L’adresse du service n’est pas encore réglée dans la page (voir le guide de mise en ligne).';
+  if(k==='reseau')return 'Le service ne répond pas. Vérifiez la connexion, puis réessayez.';
+  if(k==='serveur')return 'Le tableau a renvoyé une erreur : '+(e.detail||'inconnue')+'.';
+  return 'L’opération n’a pas abouti.';
+}
+
+/* ================= Écrans ================= */
+function ecranConnexion(msg){
+  app.innerHTML='<main class="connexion"><form id="f-connexion"><h1>Fiches de chant</h1>'
+    +'<p>Atelier de rédaction des fiches de paroles. Entrez votre code de rédacteur.</p>'
+    +'<input type="password" id="code" autocomplete="current-password" aria-label="Code de rédacteur" placeholder="Code de rédacteur" required>'
+    +'<button class="btn principal" type="submit">Entrer</button>'
+    +'<p class="statut'+(msg?' err':'')+'" id="msg-connexion" role="status">'+esc(msg||'')+'</p></form></main>';
+  $('#code').focus();
+}
+function deconnecter(msg){S.code='';ecrire('chorale-code','');S.feuilles=[];S.ed=null;S.modifie=false;ecranConnexion(msg)}
+
+function chants(){
+  var g={};
+  S.feuilles.forEach(function(f){(g[f.chant]=g[f.chant]||[]).push(f)});
+  return Object.keys(g).sort(function(a,b){return a.localeCompare(b,'fr',{sensitivity:'base'})})
+    .map(function(k){return {chant:k,feuilles:g[k].sort(function(a,b){return VX[a.voix].ordre-VX[b.voix].ordre})}});
+}
+function soeurs(){var e=S.ed;if(!e)return [];return S.feuilles.filter(function(f){return f.chant===e.chantInitial&&f.id!==e.id})}
+
+function ecranAtelier(){
+  app.innerHTML='<header class="haut"><p class="marque"><span class="portee" aria-hidden="true">'
+    +VOIX.map(function(v,i){return '<i style="background:var(--v-'+v.code+');height:'+(40+i*15)+'%"></i>'}).join('')
+    +'</span>Fiches de chant</p>'
+    +'<div class="export"><label for="format">Format</label><select id="format"><option value="a4">A4</option><option value="tel">Téléphone</option></select>'
+    +'<label for="colonnes">Colonnes</label><select id="colonnes"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option></select>'
+    +'<label for="montees">Montées</label><select id="montees"><option value="mots">Les mots montent</option><option value="fleches">Flèches</option></select>'
+    +'<button class="btn" data-a="pdf-feuille">PDF de cette voix</button><button class="btn" data-a="pdf-chant">PDF de toutes les voix</button></div>'
+    +'<p class="qui"><span id="qui"></span><button class="btn discret" data-a="deconnexion">Se déconnecter</button></p></header>'
+    +'<main class="atelier"><section class="panneau biblio" aria-label="Bibliothèque"><h2>Chants</h2>'
+    +'<input type="text" class="recherche" id="filtre" placeholder="Rechercher un chant" aria-label="Rechercher un chant">'
+    +'<ul id="liste"></ul><button class="btn" data-a="nouveau">Nouveau chant</button> <button class="btn discret" data-a="actualiser">Actualiser</button></section>'
+    +'<section class="panneau" aria-label="Rédaction"><h2>Rédaction</h2><div id="editeur"></div></section>'
+    +'<section class="panneau" aria-label="Aperçu"><h2>Page imprimée</h2><p class="apercu-info" id="apercu-info"></p><div class="cadre" id="cadre"></div></section></main>';
+  $('#format').value=reglages.format;$('#colonnes').value=reglages.colonnes;$('#montees').value=reglages.montees;
+  $('#qui').textContent=S.nom?'Connecté·e : '+S.nom:'';
+  majListe();majEditeur();majApercu();
+}
+function majListe(){
+  var ul=$('#liste');if(!ul)return;
+  var q=S.filtre.trim().toLowerCase(),e=S.ed;
+  var html=chants().filter(function(c){return !q||c.chant.toLowerCase().indexOf(q)>=0}).map(function(c){
+    var actif=e&&(e.chantInitial===c.chant);
+    return '<li class="chant-item'+(actif?' actif':'')+'"><span class="chant-nom">'+esc(c.chant)+'</span><span class="pastilles">'
+      +c.feuilles.map(function(f){var v=VX[f.voix];return '<button class="pastille'+(v.code==='U'?' unisson':'')+(e&&e.id===f.id?' actif':'')+'" style="--c:var(--v-'+v.code+')" data-ouvrir="'+esc(f.id)+'" title="'+esc(c.chant+' – '+v.nom)+'">'+esc(v.nom)+'</button>'}).join('')
+      +'</span></li>';
+  }).join('');
+  if(e&&!e.id)html='<li class="chant-item actif"><span class="chant-nom">'+esc(e.chant||'Sans titre')+'</span><span class="pastilles"><span class="pastille actif" style="--c:var(--v-'+e.voix+')">Non enregistré</span></span></li>'+html;
+  ul.innerHTML=html||'<li class="etiquette">Aucun chant'+(q?' ne correspond.':' pour l’instant.')+'</li>';
+}
+function aideHTML(){
+  return '<details><summary>Aide-mémoire de la notation</summary><dl class="aide">'
+   +'<dt><code>↑</code> <code>↓</code></dt><dd>la mélodie monte ou descend d’un cran (les ⬆️ ⬇️ du clavier marchent aussi, et <code>Alt</code>+flèche dans la saisie). Doublez pour un grand saut.</dd>'
+   +'<dt><code>H: texte</code></dt><dd>ligne harmonisée, dans la couleur de la voix de la feuille.</dd>'
+   +'<dt><code>H:</code> seul</dt><dd>toutes les lignes suivantes sont harmonisées, jusqu’à la prochaine ligne vide.</dd>'
+   +'<dt><code>[H: mots]</code></dt><dd>seulement ces mots sont harmonisés.</dd>'
+   +'<dt><code>[U: mots]</code></dt><dd>retour à l’unisson au milieu d’un passage harmonisé.</dd>'
+   +'<dt><code>beeelle</code></dt><dd>trois lettres identiques ou plus : syllabe tenue, soulignée.</dd>'
+   +'<dt><code>hiSTOIRe</code>, <code>*mot*</code></dt><dd>syllabe appuyée, en gras.</dd>'
+   +'<dt><code>(texte)</code></dt><dd>ligne entre parenthèses : traduction, en italique discret.</dd>'
+   +'<dt><code>==texte==</code></dt><dd>surligné.</dd><dt><code>~~texte~~</code></dt><dd>barré : passage que cette voix ne chante pas.</dd>'
+   +'<dt><code>## Refrain</code></dt><dd>intitulé de section.</dd>'
+   +'<dt><code>Ctrl</code>+<code>S</code></dt><dd>enregistrer tout de suite (l’enregistrement se fait aussi tout seul après quelques secondes).</dd></dl></details>';
+}
+function majEditeur(){
+  var z=$('#editeur');if(!z)return;
+  var e=S.ed;
+  if(!e){z.innerHTML='<p class="vide-atelier">Choisissez une feuille dans la liste, ou créez un nouveau chant.</p>'+aideHTML();return}
+  var prises={};soeurs().forEach(function(f){prises[f.voix]=1});
+  var manquantes=VOIX.filter(function(v){return v.code!==e.voix&&!prises[v.code]});
+  z.innerHTML='<div class="editeur">'
+   +(S.conflit?'<div class="bandeau" role="alert"><span>'+esc(S.conflit.modifie_par)+' a modifié cette feuille pendant que vous écriviez.</span><button class="btn" data-a="conflit-charger">Charger sa version</button><button class="btn" data-a="conflit-garder">Garder la mienne</button></div>':'')
+   +'<div class="champ"><label for="chant">Chant</label><input type="text" id="chant" value="'+esc(e.chant)+'"></div>'
+   +'<div class="champ"><span class="etiquette" id="lbl-voix">Voix de cette feuille</span><div class="choix-voix" role="group" aria-labelledby="lbl-voix">'
+   +VOIX.map(function(v){return '<button type="button" class="'+(v.code==='U'?'unisson':'')+'"'+(v.code==='U'?'':' style="--c:var(--v-'+v.code+')"')+' data-voix="'+v.code+'" aria-pressed="'+(e.voix===v.code)+'"'+(prises[v.code]?' disabled title="Ce chant a déjà une feuille '+esc(v.nom)+'"':'')+'><i></i>'+esc(v.nom)+'</button>'}).join('')
+   +'</div></div>'
+   +'<div class="outils" id="outils">'+outilsHTML()+'</div>'
+   +'<div class="champ"><label for="paroles">Paroles</label><textarea id="paroles" spellcheck="false">'+esc(e.texte)+'</textarea></div>'
+   +'<div class="actions"><button class="btn principal" data-a="enregistrer">Enregistrer</button>'
+   +(e.id?(S.confirmeSuppr?'<span>Supprimer la feuille '+esc(VX[e.voix].nom)+' ?</span><button class="btn danger" data-a="suppr-oui">Oui, supprimer</button><button class="btn" data-a="suppr-non">Annuler</button>':'<button class="btn danger" data-a="suppr">Supprimer cette feuille</button>'):'')
+   +'</div>'
+   +(manquantes.length?'<div class="declinaisons"><span class="etiquette">Créer à partir de cette feuille :</span>'+manquantes.map(function(v){return '<button class="pastille'+(v.code==='U'?' unisson':'')+'" style="--c:var(--v-'+v.code+')" data-decliner="'+v.code+'">'+esc(v.nom)+'</button>'}).join('')+'</div>':'')
+   +'<p class="statut" id="statut" role="status"></p>'
+   +aideHTML()+'</div>';
+  afficherStatut();
+}
+function outilsHTML(){
+  var c=S.ed?S.ed.voix:'U';
+  return '<button class="btn" data-ins="↑" title="La mélodie monte (Alt+↑)">↑ monte</button><button class="btn" data-ins="↓" title="La mélodie descend (Alt+↓)">↓ descend</button>'
+   +'<button class="btn harmo-btn" style="--c:var(--v-'+(c==='U'?'U':c)+')" data-env="[H: |]" title="Passage harmonisé">Harmonie</button>'
+   +'<button class="btn" data-env="[U: |]" title="Retour à l’unisson">Unisson</button>'
+   +'<button class="btn" data-env="*|*"><b>Appuyé</b></button><button class="btn" data-env="==|==">Surligné</button><button class="btn" data-env="~~|~~"><s>Barré</s></button>'
+   +'<button class="btn" data-env="(|)"><i>(Traduction)</i></button><button class="btn" data-ligne="## ">Section</button>';
+}
+var dernierRendu='';
+function majApercu(){
+  var cadre=$('#cadre'),info=$('#apercu-info');if(!cadre)return;
+  var e=S.ed;
+  if(!e){cadre.innerHTML='';cadre.style.height='0';info.textContent='';dernierRendu='';return}
+  var cle=JSON.stringify([e.chant,e.voix,e.texte,reglages]);
+  if(cle!==dernierRendu){
+    dernierRendu=cle;
+    var F=FORMATS[reglages.format],r=mesurer(e,reglages.format);
+    var hPage=F.h+(F.page==='A4'?26:14),wPage=F.w+(F.page==='A4'?28:14),marges=F.marge.split(' ');
+    cadre.innerHTML='<div class="page-ecran" id="page-ecran">'+r.html.map(function(p,n){
+      return '<div class="papier" style="width:'+wPage+'mm;height:'+hPage+'mm;padding:'+marges[0]+' '+marges[1]+'">'+p+(r.pages>1?'<span class="num">'+(n+1)+' / '+r.pages+'</span>':'')+'</div>'}).join('')+'</div>';
+    info.innerHTML=F.nom+' · '+(r.pages===1?'<b>tient sur 1 page</b>':'<b>'+r.pages+' pages</b>')+(F.ajuster?' · '+(r.cols===2?'2 colonnes · ':'')+'texte en '+String(r.fs).replace('.',',')+' pt':'');
+  }
+  echelle();
+}
+function echelle(){
+  var cadre=$('#cadre'),p=$('#page-ecran');if(!cadre||!p)return;
+  var k=Math.min(1,cadre.clientWidth/p.offsetWidth);
+  p.style.transform='scale('+k+')';
+  cadre.style.height=(p.offsetHeight*k)+'px';
+}
+function statut(t,k){S.statut={t:t,k:k||''};afficherStatut()}
+function afficherStatut(){var s=$('#statut');if(s){s.textContent=S.statut.t;s.className='statut'+(S.statut.k?' '+S.statut.k:'')}}
+function infoEnregistre(f){
+  if(!f||!f.modifie_le)return '';
+  var d=new Date(f.modifie_le),j=isNaN(d)?'':d.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' à '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  return 'Enregistré'+(f.modifie_par?' par '+f.modifie_par:'')+(j?', le '+j:'')+'.';
+}
+
+/* ================= Actions ================= */
+function charger(silencieux){
+  if(!silencieux)statut('Chargement…');
+  return api('lister').then(function(r){
+    S.nom=r.nom;S.feuilles=r.feuilles||[];ecrire('chorale-cache',S.feuilles);
+    if(!$('#editeur'))ecranAtelier();
+    $('#qui').textContent='Connecté·e : '+S.nom;
+    if(S.ed&&S.ed.id&&!S.modifie){
+      var f=S.feuilles.filter(function(x){return x.id===S.ed.id})[0];
+      if(!f){S.ed=null;majEditeur()}
+      else if(f.version!==S.ed.version){ouvrir(f.id,true);return}
+    }
+    majListe();majApercu();
+    if(!silencieux)statut(S.ed?infoEnregistre(trouver(S.ed.id)):'');
+  });
+}
+function trouver(id){return S.feuilles.filter(function(f){return f.id===id})[0]}
+function copie(f){return {id:f.id,chant:f.chant,chantInitial:f.chant,voix:f.voix,texte:f.texte,version:f.version}}
+function ouvrir(id,force){
+  var suite=function(){
+    var f=trouver(id);if(!f)return;
+    S.ed=copie(f);S.modifie=false;S.conflit=null;S.confirmeSuppr=false;
+    ecrire('chorale-ouverte',id);
+    majListe();majEditeur();majApercu();statut(infoEnregistre(f));
+  };
+  if(S.modifie&&!force)sauver().then(function(ok){if(ok)suite()});else suite();
+}
+function modifier(){
+  S.modifie=true;ecrire('chorale-brouillon',S.ed);
+  statut('Modifications en cours…');
+  clearTimeout(minuterie);minuterie=setTimeout(function(){sauver()},2500);
+  majApercu();
+}
+function sauver(forcer){
+  clearTimeout(minuterie);
+  var e=S.ed;if(!e)return Promise.resolve(true);
+  if(!S.modifie&&!forcer)return Promise.resolve(true);
+  if(S.conflit&&!forcer)return Promise.resolve(false);
+  if(S.enCours){S.encore=true;return Promise.resolve(false)}
+  S.enCours=true;statut('Enregistrement…');
+  var envoi={id:e.id,chant:e.chant.trim()||'Sans titre',voix:e.voix,texte:e.texte,version:e.version};
+  var ancienNom=e.chantInitial,aRenommer=e.id?soeurs():[];
+  return api('enregistrer',{feuille:envoi,forcer:!!forcer}).then(function(r){
+    S.enCours=false;
+    if(!r.ok){
+      if(r.erreur==='conflit'){S.conflit=r.feuille;majEditeur();statut('Rien n’a été écrasé : choisissez quelle version garder.','err');return false}
+      if(r.erreur==='doublon'){statut('Ce chant a déjà une feuille '+VX[e.voix].nom+'. Choisissez une autre voix ou un autre titre.','err');return false}
+      statut(messageErreur(r),'err');return false;
+    }
+    var f=r.feuille,i=S.feuilles.map(function(x){return x.id}).indexOf(f.id);
+    if(i>=0)S.feuilles[i]=f;else S.feuilles.push(f);
+    var inchange=e.texte===envoi.texte&&e.voix===envoi.voix&&e.chant.trim()===envoi.chant;
+    e.id=f.id;e.version=f.version;e.chantInitial=f.chant;
+    if(inchange){S.modifie=false;ecrire('chorale-brouillon',null)}
+    ecrire('chorale-ouverte',f.id);
+    var suite=Promise.resolve();
+    if(ancienNom&&ancienNom!==f.chant)aRenommer.forEach(function(s){
+      suite=suite.then(function(){return api('enregistrer',{feuille:{id:s.id,chant:f.chant,voix:s.voix,texte:s.texte,version:s.version}}).then(function(r2){
+        if(r2.ok){var j=S.feuilles.map(function(x){return x.id}).indexOf(s.id);if(j>=0)S.feuilles[j]=r2.feuille}
+      })});
+    });
+    return suite.then(function(){
+      majListe();
+      if(document.activeElement&&document.activeElement.id!=='paroles'&&document.activeElement.id!=='chant')majEditeur();
+      statut(S.modifie?'Modifications en cours…':infoEnregistre(f),S.modifie?'':'ok');
+      if(S.encore){S.encore=false;return sauver()}
+      if(S.modifie){minuterie=setTimeout(function(){sauver()},2500)}
+      return true;
+    });
+  },function(err){S.enCours=false;statut(messageErreur(err)+' Vos modifications sont gardées sur cet ordinateur.','err');return false});
+}
+function nouvelle(chant,voix,texte){
+  S.ed={id:null,chant:chant,chantInitial:null,voix:voix,texte:texte,version:0};
+  S.conflit=null;S.confirmeSuppr=false;
+}
+function inserer(avant,apres){
+  var t=$('#paroles');if(!t)return;
+  var a=t.selectionStart,b=t.selectionEnd,v=t.value,sel=v.slice(a,b);
+  t.value=v.slice(0,a)+avant+sel+apres+v.slice(b);
+  t.focus();t.selectionStart=a+avant.length;t.selectionEnd=a+avant.length+sel.length;
+  S.ed.texte=t.value;modifier();
+}
+function debutLigne(prefixe){
+  var t=$('#paroles');if(!t)return;
+  var a=t.selectionStart,v=t.value,d=v.lastIndexOf('\n',a-1)+1;
+  t.value=v.slice(0,d)+prefixe+v.slice(d);t.focus();t.selectionStart=t.selectionEnd=a+prefixe.length;
+  S.ed.texte=t.value;modifier();
+}
+function nomFichier(f,tout){return (f.chant||'Fiche')+(tout?'':' – '+VX[f.voix].nom)}
+
+document.addEventListener('submit',function(ev){
+  if(ev.target.id!=='f-connexion')return;ev.preventDefault();
+  S.code=$('#code').value.trim();var m=$('#msg-connexion');m.className='statut';m.textContent='Vérification…';
+  api('lister').then(function(r){
+    if(!r.ok){m.className='statut err';m.textContent=messageErreur(r);return}
+    ecrire('chorale-code',S.code);S.nom=r.nom;S.feuilles=r.feuilles||[];demarrerAtelier();
+  },function(e){if(e&&e.erreur==='code')return;m.className='statut err';m.textContent=messageErreur(e)});
+});
+document.addEventListener('click',function(ev){
+  var b=ev.target.closest('button');if(!b||b.disabled)return;
+  if(b.dataset.ouvrir){ouvrir(b.dataset.ouvrir);return}
+  if(b.dataset.ins!==undefined){inserer(b.dataset.ins,'');return}
+  if(b.dataset.env!==undefined){var p=b.dataset.env.split('|');inserer(p[0],p[1]);return}
+  if(b.dataset.ligne!==undefined){debutLigne(b.dataset.ligne);return}
+  if(b.dataset.voix){S.ed.voix=b.dataset.voix;majEditeur();modifier();return}
+  if(b.dataset.decliner){
+    var e=S.ed,v=b.dataset.decliner;
+    sauver().then(function(ok){
+      if(!ok&&S.modifie)return;
+      nouvelle(e.chant,v,e.texte);S.ed.chantInitial=e.chant;S.modifie=true;
+      majListe();majEditeur();majApercu();sauver(false).then(function(){majListe();majEditeur()});
+    });return;
+  }
+  var a=b.dataset.a;
+  if(a==='enregistrer'){sauver(false).then(function(){S.modifie||statut(infoEnregistre(trouver(S.ed&&S.ed.id)),'ok')});return}
+  if(a==='nouveau'){sauver().then(function(ok){if(!ok&&S.modifie)return;nouvelle('Nouveau chant','U','');S.modifie=false;majListe();majEditeur();majApercu();statut('Donnez un titre, puis écrivez les paroles : la feuille s’enregistre toute seule.');var c=$('#chant');c.focus();c.select()});return}
+  if(a==='actualiser'){sauver().then(function(){return charger()}).catch(function(e){statut(messageErreur(e),'err')});return}
+  if(a==='deconnexion'){sauver().then(function(){deconnecter('')});return}
+  if(a==='suppr'){S.confirmeSuppr=true;majEditeur();return}
+  if(a==='suppr-non'){S.confirmeSuppr=false;majEditeur();return}
+  if(a==='suppr-oui'){
+    var d=S.ed;clearTimeout(minuterie);
+    api('supprimer',{id:d.id,version:d.version}).then(function(r){
+      if(!r.ok){S.confirmeSuppr=false;if(r.erreur==='conflit'){S.conflit=r.feuille;majEditeur();statut('La feuille a été modifiée entre-temps : rien n’a été supprimé.','err')}else statut(messageErreur(r),'err');return}
+      S.feuilles=S.feuilles.filter(function(f){return f.id!==d.id});
+      var reste=S.feuilles.filter(function(f){return f.chant===d.chantInitial})[0];
+      S.modifie=false;S.ed=null;S.confirmeSuppr=false;
+      if(reste)ouvrir(reste.id,true);else{majListe();majEditeur();majApercu()}
+      statut('Feuille supprimée. Elle reste récupérable dans l’onglet « Corbeille » du tableau.','ok');
+    },function(err){statut(messageErreur(err),'err')});return;
+  }
+  if(a==='conflit-charger'){var f=S.conflit;S.conflit=null;S.modifie=false;var i=S.feuilles.map(function(x){return x.id}).indexOf(f.id);if(i>=0)S.feuilles[i]=f;ouvrir(f.id,true);return}
+  if(a==='conflit-garder'){S.conflit=null;majEditeur();sauver(true);return}
+  if(a==='pdf-feuille'){if(!S.ed){statut('Ouvrez d’abord une feuille.','err');return}imprimer([S.ed],nomFichier(S.ed));return}
+  if(a==='pdf-chant'){
+    if(!S.ed){statut('Ouvrez d’abord une feuille.','err');return}
+    var lot=[S.ed].concat(soeurs()).sort(function(x,y){return VX[x.voix].ordre-VX[y.voix].ordre});
+    imprimer(lot,nomFichier(S.ed,true));return;
+  }
+});
+document.addEventListener('input',function(ev){
+  var t=ev.target;
+  if(t.id==='paroles'&&S.ed){S.ed.texte=t.value;modifier()}
+  else if(t.id==='chant'&&S.ed){S.ed.chant=t.value;modifier()}
+  else if(t.id==='filtre'){S.filtre=t.value;majListe()}
+});
+document.addEventListener('change',function(ev){
+  var t=ev.target;
+  if(t.id==='format'||t.id==='montees'||t.id==='colonnes'){reglages[t.id]=t.value;ecrire('chorale-reglages',reglages);majApercu()}
+  if(t.id==='chant'&&S.ed){majListe()}
+});
+document.addEventListener('keydown',function(ev){
+  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'&&S.ed){ev.preventDefault();sauver(false);return}
+  if(ev.altKey&&ev.target.id==='paroles'&&(ev.key==='ArrowUp'||ev.key==='ArrowDown')){ev.preventDefault();inserer(ev.key==='ArrowUp'?'↑':'↓','')}
+});
+window.addEventListener('resize',echelle);
+window.addEventListener('focus',function(){if(S.code&&!S.modifie&&!S.enCours&&$('#editeur'))charger(true).catch(function(){})});
+window.addEventListener('beforeunload',function(ev){if(S.modifie){ev.preventDefault();ev.returnValue=''}});
+
+function demarrerAtelier(){
+  ecranAtelier();
+  var br=lire('chorale-brouillon'),id=lire('chorale-ouverte');
+  if(br&&(br.id===null||trouver(br.id))){
+    S.ed=br;S.modifie=true;majListe();majEditeur();majApercu();
+    statut('Brouillon non enregistré retrouvé : il va être enregistré.');sauver();
+  }else if(id&&trouver(id))ouvrir(id,true);
+  else if(S.feuilles.length)ouvrir(chants()[0].feuilles[0].id,true);
+}
+
+/* ================= Démarrage ================= */
+var pret=document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve();
+pret.then(function(){
+  if(!ADRESSE_SERVICE){ecranConnexion('L’adresse du service n’est pas encore réglée dans la page (voir le guide de mise en ligne).');return}
+  if(!S.code){ecranConnexion('');return}
+  app.innerHTML='<p class="vide-atelier">Chargement des chants…</p>';
+  api('lister').then(function(r){if(!r.ok){ecranConnexion(messageErreur(r));return}S.nom=r.nom;S.feuilles=r.feuilles||[];demarrerAtelier()},
+    function(e){
+      if(e&&e.erreur==='code')return;
+      var cache=lire('chorale-cache');
+      if(cache){S.feuilles=cache;demarrerAtelier();statut(messageErreur(e)+' Affichage de la dernière version chargée.','err')}
+      else ecranConnexion(messageErreur(e));
+    });
+});
+})();
+</script>
+</body>
+</html>
