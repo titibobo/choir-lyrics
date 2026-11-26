@@ -9,7 +9,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&display=swap">
 <script>
 /* ===== Réglage : collez ici l'adresse de l'application Web Apps Script (se termine par /exec) ===== */
-var ADRESSE_SERVICE = 'https://script.google.com/macros/s/AKfycbzA-UhkAVPfVaVckoc2akGSexOBRP-zUxqIhR6crJF78MoHEGmadWyi68lPYwG1lKBC/exec';
+var ADRESSE_SERVICE = '';
+/* Crédits proposés par défaut sur chaque fiche ({année} = année de la feuille) ; modifiables feuille par feuille */
+var CREDITS_DEFAUT = { arrangement: 'Clairie', version: 'Le labo de Clairie – {année}' };
 </script>
 <style>
 /* Atelier de rédaction : bibliothèque à gauche, saisie au centre, page imprimée à droite (empilés sur petit écran).
@@ -80,6 +82,9 @@ input[type=text],input[type=password],select{background:var(--surface);border:1p
 .pastille.manquante:hover{border-color:var(--c);color:var(--encre)}
 .legende-liste{display:flex;flex-direction:column;gap:.3rem;align-items:center;font-size:.75rem;color:var(--discret);margin:0 0 .75rem}
 .legende-liste .pastille{cursor:default}
+.credits-ed{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:.5rem}
+.credits-ed input{font-size:.9rem}
+@media (max-width:500px){ .credits-ed{grid-template-columns:minmax(0,1fr)} }
 .division{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--discret);margin-left:.25rem}
 .division select{padding:.2rem .4rem;color:var(--encre)}
 .validation{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between;border:1px dashed var(--trait);border-radius:8px;padding:.45rem .7rem;font-size:.9rem;color:var(--discret)}
@@ -139,7 +144,8 @@ summary{cursor:pointer;font-size:.9rem}
 .fiche-tete h1{font-family:var(--titre);font-weight:700;font-size:1.55em;line-height:1.15;margin:0 0 .3em;text-wrap:balance}
 .fiche-voix{display:inline-flex;align-items:center;gap:.45em;margin:0;font-size:.78em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--harmo)}
 .fiche-voix i{width:.75em;height:.75em;border-radius:50%;background:var(--harmo)}
-.fiche-voix.unisson{color:var(--papier-discret)}
+.fiche-credits{display:flex;flex-direction:column;margin:.55em 0 0;font-size:.7em;line-height:1.4;color:var(--papier-discret)}
+.fiche s,.fiche s .niv{text-decoration-thickness:.045em}
 .paroles{line-height:1.55}
 .colonnes{display:grid;grid-template-columns:minmax(0,1fr);align-items:start}
 .colonnes.n2{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:7mm;background:linear-gradient(#e2deea,#e2deea) center top/.5pt 100% no-repeat}
@@ -257,8 +263,18 @@ function ficheHTML(f,fs){
   var v=VX[f.voix]||VX.U,r=rendre(f.texte);
   return '<article class="fiche" style="--harmo:var(--v-'+v.code+');'+(fs?'--fs:'+fs+'pt':'')+'">'
     +'<header class="fiche-tete"><h1>'+esc(f.chant||'Sans titre')+'</h1>'
-    +'<p class="fiche-voix'+(v.code==='U'?' unisson':'')+'"><i></i>'+esc(nomVoix(f))+'</p></header>'
+    +(v.code==='U'?'':'<p class="fiche-voix"><i></i>'+esc(nomVoix(f))+'</p>')
+    +creditsHTML(f)+'</header>'
     +'<div class="paroles'+(reglages.montees==='fleches'?'':' mots')+'" style="'+r.style+'">'+r.html+'</div></article>';
+}
+
+function credits(f){
+  var an=(f.modifie_le&&!isNaN(new Date(f.modifie_le))?new Date(f.modifie_le):new Date()).getFullYear();
+  return {arr:(f.arrangement||CREDITS_DEFAUT.arrangement||'').trim(),ver:(f.version_texte||String(CREDITS_DEFAUT.version||'').replace('{année}',an)).trim()};
+}
+function creditsHTML(f){
+  var c=credits(f);if(!c.arr&&!c.ver)return '';
+  return '<p class="fiche-credits">'+(c.arr?'<span>Arrangements vocaux : '+esc(c.arr)+'</span>':'')+(c.ver?'<span>Version : '+esc(c.ver)+'</span>':'')+'</p>';
 }
 
 /* ================= Mise en page ================= */
@@ -441,6 +457,8 @@ function majEditeur(){
   z.innerHTML='<div class="editeur">'
    +(S.conflit?'<div class="bandeau" role="alert"><span>'+esc(S.conflit.modifie_par)+' a modifié cette feuille pendant que vous écriviez.</span><button class="btn" data-a="conflit-charger">Charger sa version</button><button class="btn" data-a="conflit-garder">Garder la mienne</button></div>':'')
    +'<div class="champ"><label for="chant">Chant</label><input type="text" id="chant" value="'+esc(e.chant)+'"></div>'
+   +'<div class="credits-ed"><div class="champ"><label for="arrangement">Arrangements vocaux</label><input type="text" id="arrangement" value="'+esc(credits(e).arr)+'"></div>'
+   +'<div class="champ"><label for="versionTxt">Version</label><input type="text" id="versionTxt" value="'+esc(credits(e).ver)+'"></div></div>'
    +'<div id="validation"></div>'
    +'<div class="champ"><span class="etiquette" id="lbl-voix">Voix de cette feuille</span><div class="choix-voix" role="group" aria-labelledby="lbl-voix">'
    +VOIX.map(function(v){var pris=prises[v.code+'|'+(e.variante||'')];return '<button type="button" class="'+(v.code==='U'?'unisson':'')+'"'+(v.code==='U'?'':' style="--c:var(--v-'+v.code+')"')+' data-voix="'+v.code+'" aria-pressed="'+(e.voix===v.code)+'"'+(pris?' disabled title="Ce chant a déjà une feuille '+esc(v.nom+(e.variante?' '+e.variante:''))+'"':'')+'><i></i>'+esc(v.nom)+'</button>'}).join('')
@@ -480,7 +498,7 @@ function majApercu(){
   var cadre=$('#cadre'),info=$('#apercu-info');if(!cadre)return;
   var e=S.ed;
   if(!e){cadre.innerHTML='';cadre.style.height='0';info.textContent='';dernierRendu='';return}
-  var cle=JSON.stringify([e.chant,e.voix,e.variante,e.texte,reglages]);
+  var cle=JSON.stringify([e.chant,e.voix,e.variante,e.texte,e.arrangement,e.version_texte,reglages]);
   if(cle+(e.valide_par||'')!==dernierRendu){
     dernierRendu=cle+(e.valide_par||'');
     var F=FORMATS[reglages.format],r=mesurer(e,reglages.format);
@@ -522,7 +540,7 @@ function charger(silencieux){
   });
 }
 function trouver(id){return S.feuilles.filter(function(f){return f.id===id})[0]}
-function copie(f){return {id:f.id,chant:f.chant,chantInitial:f.chant,voix:f.voix,variante:f.variante||'',texte:f.texte,version:f.version,valide_par:f.valide_par||'',valide_le:f.valide_le||''}}
+function copie(f){var c=credits(f);return {id:f.id,chant:f.chant,chantInitial:f.chant,voix:f.voix,variante:f.variante||'',texte:f.texte,version:f.version,valide_par:f.valide_par||'',valide_le:f.valide_le||'',modifie_le:f.modifie_le,arrangement:c.arr,version_texte:c.ver}}
 function ouvrir(id,force){
   var suite=function(){
     var f=trouver(id);if(!f)return;
@@ -546,7 +564,7 @@ function sauver(forcer){
   if(S.conflit&&!forcer)return Promise.resolve(false);
   if(S.enCours){S.encore=true;return Promise.resolve(false)}
   S.enCours=true;statut('Enregistrement…');
-  var envoi={id:e.id,chant:e.chant.trim()||'Sans titre',voix:e.voix,variante:e.variante||'',texte:e.texte,version:e.version};
+  var cr=credits(e),envoi={id:e.id,chant:e.chant.trim()||'Sans titre',voix:e.voix,variante:e.variante||'',texte:e.texte,version:e.version,arrangement:cr.arr,version_texte:cr.ver};
   var ancienNom=e.chantInitial,aRenommer=e.id?soeurs():[];
   return api('enregistrer',{feuille:envoi,forcer:!!forcer}).then(function(r){
     S.enCours=false;
@@ -557,19 +575,20 @@ function sauver(forcer){
     }
     var f=r.feuille,i=S.feuilles.map(function(x){return x.id}).indexOf(f.id);
     if(i>=0)S.feuilles[i]=f;else S.feuilles.push(f);
-    var inchange=e.texte===envoi.texte&&e.voix===envoi.voix&&(e.variante||'')===envoi.variante&&e.chant.trim()===envoi.chant;
+    var inchange=e.texte===envoi.texte&&e.voix===envoi.voix&&(e.variante||'')===envoi.variante&&e.chant.trim()===envoi.chant&&credits(e).arr===envoi.arrangement&&credits(e).ver===envoi.version_texte;
     e.id=f.id;e.version=f.version;e.chantInitial=f.chant;e.valide_par=f.valide_par||'';e.valide_le=f.valide_le||'';
     if(inchange){S.modifie=false;ecrire('chorale-brouillon',null)}
     ecrire('chorale-ouverte',f.id);
     var suite=Promise.resolve();
-    if(ancienNom&&ancienNom!==f.chant)aRenommer.forEach(function(s){
-      suite=suite.then(function(){return api('enregistrer',{feuille:{id:s.id,chant:f.chant,voix:s.voix,variante:s.variante||'',texte:s.texte,version:s.version}}).then(function(r2){
+    /* le titre et les crédits valent pour tout le chant : on les reporte sur les autres voix */
+    aRenommer.filter(function(s){return s.chant!==f.chant||(s.arrangement||'')!==envoi.arrangement||(s.version_texte||'')!==envoi.version_texte}).forEach(function(s){
+      suite=suite.then(function(){return api('enregistrer',{feuille:{id:s.id,chant:f.chant,voix:s.voix,variante:s.variante||'',texte:s.texte,version:s.version,arrangement:envoi.arrangement,version_texte:envoi.version_texte}}).then(function(r2){
         if(r2.ok){var j=S.feuilles.map(function(x){return x.id}).indexOf(s.id);if(j>=0)S.feuilles[j]=r2.feuille}
       })});
     });
     return suite.then(function(){
       majListe();majValidation();majApercu();
-      if(document.activeElement&&document.activeElement.id!=='paroles'&&document.activeElement.id!=='chant')majEditeur();
+      if(document.activeElement&&['paroles','chant','arrangement','versionTxt'].indexOf(document.activeElement.id)<0)majEditeur();
       statut(S.modifie?'Modifications en cours…':infoEnregistre(f),S.modifie?'':'ok');
       if(S.encore){S.encore=false;return sauver()}
       if(S.modifie){minuterie=setTimeout(function(){sauver()},2500)}
@@ -577,8 +596,9 @@ function sauver(forcer){
     });
   },function(err){S.enCours=false;statut(messageErreur(err)+' Vos modifications sont gardées sur cet ordinateur.','err');return false});
 }
-function nouvelle(chant,voix,texte,variante){
-  S.ed={id:null,chant:chant,chantInitial:null,voix:voix,variante:variante||'',texte:texte,version:0,valide_par:'',valide_le:''};
+function nouvelle(chant,voix,texte,variante,src){
+  var c=src?credits(src):credits({});
+  S.ed={id:null,chant:chant,chantInitial:null,voix:voix,variante:variante||'',texte:texte,version:0,valide_par:'',valide_le:'',arrangement:c.arr,version_texte:c.ver};
   S.conflit=null;S.confirmeSuppr=false;
 }
 /* Insertion au curseur sans faire sauter la zone de saisie (et en gardant Ctrl+Z) */
@@ -604,7 +624,7 @@ function debutLigne(prefixe){
   t.setSelectionRange(a+prefixe.length,a+prefixe.length);t.scrollTop=haut;
   S.ed.texte=t.value;modifier();
 }
-function nomFichier(f,tout){return (f.chant||'Fiche')+(tout?'':' – '+nomVoix(f))}
+function nomFichier(f,tout){return (f.chant||'Fiche')+(tout||f.voix==='U'?'':' – '+nomVoix(f))}
 
 document.addEventListener('submit',function(ev){
   if(ev.target.id!=='f-connexion')return;ev.preventDefault();
@@ -627,7 +647,7 @@ document.addEventListener('click',function(ev){
       if(!ok&&S.modifie)return;
       var grp=chants().filter(function(c){return c.chant===nomChant})[0];if(!grp)return;
       var src=S.ed&&S.ed.id&&S.ed.chantInitial===nomChant?S.ed:grp.feuilles[0];
-      nouvelle(nomChant,code,src.texte,'');S.ed.chantInitial=nomChant;S.modifie=true;
+      nouvelle(nomChant,code,src.texte,'',src);S.ed.chantInitial=nomChant;S.modifie=true;
       majListe();majEditeur();majApercu();
       sauver().then(function(ok2){majListe();majEditeur();if(ok2)statut('Feuille '+VX[code].nom+' créée à partir de la feuille '+nomVoix(src)+' : ajustez les passages harmonisés.','ok')});
     });return;
@@ -636,7 +656,7 @@ document.addEventListener('click',function(ev){
     var e=S.ed,v=b.dataset.decliner;
     sauver().then(function(ok){
       if(!ok&&S.modifie)return;
-      nouvelle(e.chant,v,e.texte,'');S.ed.chantInitial=e.chant;S.modifie=true;
+      nouvelle(e.chant,v,e.texte,'',e);S.ed.chantInitial=e.chant;S.modifie=true;
       majListe();majEditeur();majApercu();sauver(false).then(function(){majListe();majEditeur()});
     });return;
   }
@@ -646,7 +666,7 @@ document.addEventListener('click',function(ev){
     if(!d0.variante){d0.variante='1';S.modifie=true}
     sauver().then(function(ok){
       if(!ok&&S.modifie)return;
-      nouvelle(d0.chant,d0.voix,d0.texte,n);S.ed.chantInitial=d0.chant;S.modifie=true;
+      nouvelle(d0.chant,d0.voix,d0.texte,n,d0);S.ed.chantInitial=d0.chant;S.modifie=true;
       majListe();majEditeur();majApercu();sauver().then(function(){majListe();majEditeur()});
     });return;
   }
@@ -693,6 +713,8 @@ document.addEventListener('input',function(ev){
   var t=ev.target;
   if(t.id==='paroles'&&S.ed){S.ed.texte=t.value;modifier()}
   else if(t.id==='chant'&&S.ed){S.ed.chant=t.value;modifier()}
+  else if(t.id==='arrangement'&&S.ed){S.ed.arrangement=t.value;modifier()}
+  else if(t.id==='versionTxt'&&S.ed){S.ed.version_texte=t.value;modifier()}
   else if(t.id==='filtre'){S.filtre=t.value;majListe()}
 });
 document.addEventListener('change',function(ev){
