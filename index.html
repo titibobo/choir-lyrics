@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&display=swap">
 <script>
 /* ===== Réglage : collez ici l'adresse de l'application Web Apps Script (se termine par /exec) ===== */
-var ADRESSE_SERVICE = 'https://script.google.com/macros/s/AKfycbzA-UhkAVPfVaVckoc2akGSexOBRP-zUxqIhR6crJF78MoHEGmadWyi68lPYwG1lKBC/exec';
+var ADRESSE_SERVICE = '';
 /* Crédits proposés par défaut sur chaque fiche ({année} = année de la feuille) ; modifiables feuille par feuille */
 var CREDITS_DEFAUT = { arrangement: 'Clairie', version: 'Le labo de Clairie – {année}' };
 </script>
@@ -142,8 +142,12 @@ summary{cursor:pointer;font-size:.9rem}
 .fiche{--fs:13pt;font-family:var(--texte);font-size:var(--fs);color:var(--papier-encre);background:var(--papier);text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .fiche-tete{margin-bottom:.9em}
 .fiche-tete h1{font-family:var(--titre);font-weight:700;font-size:1.55em;line-height:1.15;margin:0 0 .3em;text-wrap:balance}
-.fiche-voix{display:inline-flex;align-items:center;gap:.45em;margin:0;font-size:.78em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--harmo)}
+.fiche-voix{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.4em 1.3em;margin:0;font-size:.78em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--harmo)}
 .fiche-voix i{width:.75em;height:.75em;border-radius:50%;background:var(--harmo)}
+.fiche-voix .vx{display:inline-flex;align-items:center;gap:.45em}
+.fiche-voix .dv{font-size:.8em}
+.dv{display:inline-flex;align-items:center;justify-content:center;width:1.35em;height:1.35em;border-radius:50%;background:var(--harmo);color:#fff;font-size:.62em;font-weight:700;font-style:normal;line-height:1;letter-spacing:0;vertical-align:.12em;margin-right:.3em;text-decoration:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sep{color:#b9b3c6;margin-inline:.15em}
 .fiche-credits{display:flex;flex-direction:column;margin:.55em 0 0;font-size:.7em;line-height:1.4;color:var(--papier-discret)}
 .fiche s,.fiche s .niv{text-decoration-thickness:.045em}
 .paroles{line-height:1.55}
@@ -211,7 +215,8 @@ function mot(w){
     return w.split(/(\p{Lu}{2,})/u).map(function(p,i){return i%2?'<b class="app">'+tenue(p)+'</b>':tenue(p)}).join('');
   return tenue(w);
 }
-function mots(s){var o='',i=0;s.replace(/\p{L}+/gu,function(w,pos){o+=esc(s.slice(i,pos))+mot(w);i=pos+w.length;return w});return o+esc(s.slice(i))}
+function ponct(t){return esc(t).replace(/\|/g,'<span class="sep">|</span>')}
+function mots(s){var o='',i=0;s.replace(/\p{L}+/gu,function(w,pos){o+=ponct(s.slice(i,pos))+mot(w);i=pos+w.length;return w});return o+ponct(s.slice(i))}
 function fleche(haut){
   return '<span class="pt">'+(haut
    ? '<svg class="fl" viewBox="0 0 16 16" role="img" aria-label="monte"><circle cx="8" cy="8" r="7.25" fill="currentColor"/><path d="M8 12V4.6M4.8 7.7 8 4.5l3.2 3.2" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -227,43 +232,47 @@ function texte(s){
   }
   return o+seg(s.slice(i));
 }
+var divs={};
+function marque(n){if(!n)return '';divs[n]=1;return '<span class="dv">'+n+'</span>'}
 function enLigne(s){
-  var o='',i=0,re=/\[(\p{L}{1,3})\s*:\s*([^\]]*)\]|==(.+?)==|~~(.+?)~~|\*(.+?)\*/gu;
+  var o='',i=0,re=/\[(\p{L}{1,3})(\d?)\s*:\s*([^\]]*)\]|==(.+?)==|~~(.+?)~~|\*(.+?)\*/gu;
   Array.from(s.matchAll(re)).forEach(function(m){
     o+=texte(s.slice(i,m.index));i=m.index+m[0].length;
     if(m[1]!==undefined){
       var c=m[1].toUpperCase();
-      if(c==='U')o+='<span class="uni">'+enLigne(m[2])+'</span>';
-      else if(HARMO[c])o+='<span class="harmo">'+enLigne(m[2])+'</span>';
+      if(c==='U')o+='<span class="uni">'+enLigne(m[3])+'</span>';
+      else if(HARMO[c])o+='<span class="harmo">'+marque(m[2])+enLigne(m[3])+'</span>';
       else o+=texte(m[0]);
     }
-    else if(m[3]!==undefined)o+='<mark>'+enLigne(m[3])+'</mark>';
-    else if(m[4]!==undefined)o+='<s>'+enLigne(m[4])+'</s>';
-    else o+='<b class="app">'+enLigne(m[5])+'</b>';
+    else if(m[4]!==undefined)o+='<mark>'+enLigne(m[4])+'</mark>';
+    else if(m[5]!==undefined)o+='<s>'+enLigne(m[5])+'</s>';
+    else o+='<b class="app">'+enLigne(m[6])+'</b>';
   });
   return o+texte(s.slice(i));
 }
 function rendre(src){
-  var bloc=false,o='',E=0;
+  /* bloc / h : null = unisson, '' = harmonie, '1', '2'… = division de la voix */
+  var bloc=null,o='',E=0;divs={};
   String(src||'').split('\n').forEach(function(l0){
     var l=l0.trim();
-    if(!l){bloc=false;o+='<div class="vide"></div>';return}
+    if(!l){bloc=null;o+='<div class="vide"></div>';return}
     if(l.indexOf('##')===0){o+='<p class="section">'+esc(l.replace(/^#+\s*/,''))+'</p>';return}
-    var h=bloc,t=l,m=l.match(/^(\p{L}{1,3})\s*:\s*(.*)$/u);
+    var h=bloc,t=l,m=l.match(/^(\p{L}{1,3})(\d?)\s*:\s*(.*)$/u);
     if(m){var c=m[1].toUpperCase();
-      if(c==='U'||HARMO[c]){var hh=c!=='U';if(!m[2]){bloc=hh;return}h=hh;t=m[2]}}
+      if(c==='U'||HARMO[c]){var hh=c==='U'?null:m[2];if(!m[3]){bloc=hh;return}h=hh;t=m[3]}}
     niv={n:0,min:0,max:0};
-    var html=enLigne(t),avec=html.indexOf('class="pt"')>=0;E=Math.max(E,niv.max-niv.min);
-    o+='<p dir="auto" class="ligne'+(h?' harmo':'')+(/^\(.*\)$/.test(t)?' trad':'')+(avec?' avec':'')+'"'+(avec?' style="--mid:'+((niv.max+niv.min)/2)+'"':'')+'>'+html+'</p>';
+    var html=(h?marque(h):'')+enLigne(t),avec=html.indexOf('class="pt"')>=0;E=Math.max(E,niv.max-niv.min);
+    o+='<p dir="auto" class="ligne'+(h!==null?' harmo':'')+(/^\(.*\)$/.test(t)?' trad':'')+(avec?' avec':'')+'"'+(avec?' style="--mid:'+((niv.max+niv.min)/2)+'"':'')+'>'+html+'</p>';
   });
   var pas=Math.min(.28,.6/Math.max(1,E));
-  return {html:o,style:E?'--pas:'+pas.toFixed(3)+'em;--haut:'+(1.55+E*pas).toFixed(3)+'em':''};
+  return {html:o,divs:Object.keys(divs).sort(),style:E?'--pas:'+pas.toFixed(3)+'em;--haut:'+(1.55+E*pas).toFixed(3)+'em':''};
 }
 function ficheHTML(f,fs){
   var v=VX[f.voix]||VX.U,r=rendre(f.texte);
   return '<article class="fiche" style="--harmo:var(--v-'+v.code+');'+(fs?'--fs:'+fs+'pt':'')+'">'
     +'<header class="fiche-tete"><h1>'+esc(f.chant||'Sans titre')+'</h1>'
-    +(v.code==='U'?'':'<p class="fiche-voix"><i></i>'+esc(nomVoix(f))+'</p>')
+    +(v.code!=='U'||r.divs.length?'<p class="fiche-voix">'+(v.code==='U'?'':'<span class="vx"><i></i>'+esc(nomVoix(f))+'</span>')
+      +r.divs.map(function(n){return '<span class="vx"><span class="dv">'+n+'</span>'+esc(v.code==='U'?'Voix '+n:v.nom+' '+n)+'</span>'}).join('')+'</p>':'')
     +creditsHTML(f)+'</header>'
     +'<div class="paroles'+(reglages.montees==='fleches'?'':' mots')+'" style="'+r.style+'">'+r.html+'</div></article>';
 }
@@ -442,7 +451,8 @@ function aideHTML(){
    +'<dt><code>(texte)</code></dt><dd>ligne entre parenthèses : traduction, en italique discret.</dd>'
    +'<dt><code>==texte==</code></dt><dd>surligné.</dd><dt><code>~~texte~~</code></dt><dd>barré : passage que cette voix ne chante pas.</dd>'
    +'<dt><code>## Refrain</code></dt><dd>intitulé de section.</dd>'
-   +'<dt>Divisions</dt><dd>pour un pupitre divisé (Aigus 1 et Aigus 2…), utilisez « Diviser » ou le menu Division : chaque division a sa feuille.</dd>'
+   +'<dt><code>[H1: …]</code> <code>[H2: …]</code></dt><dd>pupitre divisé : passage de la division 1 ou 2, dans la couleur de la voix, avec un petit ¹ ou ² devant. Marche aussi en début de ligne (<code>H2: texte</code>) et en bloc (<code>H1:</code> seul).</dd>'
+   +'<dt><code>|</code></dt><dd>sépare deux passages chantés en même temps : <code>[H1: Help myself!] | [H2: ↑↑Help myself!]</code></dd>'
    +'<dt>Validation</dt><dd>« Valider la transcription » marque la feuille comme relue (✓ dans la liste). Toute modification du texte retire la validation.</dd>'
    +'<dt><code>Ctrl</code>+<code>S</code></dt><dd>enregistrer tout de suite (l’enregistrement se fait aussi tout seul après quelques secondes).</dd></dl></details>';
 }
@@ -462,7 +472,6 @@ function majEditeur(){
    +'<div id="validation"></div>'
    +'<div class="champ"><span class="etiquette" id="lbl-voix">Voix de cette feuille</span><div class="choix-voix" role="group" aria-labelledby="lbl-voix">'
    +VOIX.map(function(v){var pris=prises[v.code+'|'+(e.variante||'')];return '<button type="button" class="'+(v.code==='U'?'unisson':'')+'"'+(v.code==='U'?'':' style="--c:var(--v-'+v.code+')"')+' data-voix="'+v.code+'" aria-pressed="'+(e.voix===v.code)+'"'+(pris?' disabled title="Ce chant a déjà une feuille '+esc(v.nom+(e.variante?' '+e.variante:''))+'"':'')+'><i></i>'+esc(v.nom)+'</button>'}).join('')
-   +'<label class="division">Division <select id="variante">'+['','1','2','3','4'].map(function(n){return '<option value="'+n+'"'+((e.variante||'')===n?' selected':'')+(prises[e.voix+'|'+n]?' disabled':'')+'>'+(n?nomVoix({voix:e.voix,variante:n}):'aucune')+'</option>'}).join('')+'</select></label>'
    +'</div></div>'
    +'<div class="outils" id="outils">'+outilsHTML()+'</div>'
    +'<div class="champ"><label for="paroles">Paroles</label><textarea id="paroles" spellcheck="false">'+esc(e.texte)+'</textarea></div>'
@@ -470,7 +479,7 @@ function majEditeur(){
    +(e.id?(S.confirmeSuppr?'<span>Supprimer la feuille '+esc(nomVoix(e))+' ?</span><button class="btn danger" data-a="suppr-oui">Oui, supprimer</button><button class="btn" data-a="suppr-non">Annuler</button>':'<button class="btn danger" data-a="suppr">Supprimer cette feuille</button>'):'')
    +'</div>'
    +'<div class="declinaisons"><span class="etiquette">Créer à partir de cette feuille :</span>'+manquantes.map(function(v){return '<button class="pastille'+(v.code==='U'?' unisson':'')+'" style="--c:var(--v-'+v.code+')" data-decliner="'+v.code+'">'+esc(v.nom)+'</button>'}).join('')
-   +(e.voix!=='U'?'<button class="btn discret" data-a="diviser" data-n="'+prochaine+'">'+(e.variante?'+ '+esc(nomVoix({voix:e.voix,variante:String(prochaine)})):'Diviser en '+esc(nomVoix({voix:e.voix,variante:'1'}))+' et '+esc(nomVoix({voix:e.voix,variante:'2'})))+'</button>':'')+'</div>'
+   +'</div>'
    +'<p class="statut" id="statut" role="status"></p>'
    +aideHTML()+'</div>';
   S.edAffiche=e;
@@ -489,6 +498,9 @@ function outilsHTML(){
   var c=S.ed?S.ed.voix:'U';
   return '<button class="btn" data-ins="↑" title="La mélodie monte (Alt+↑)">↑ monte</button><button class="btn" data-ins="↓" title="La mélodie descend (Alt+↓)">↓ descend</button>'
    +'<button class="btn harmo-btn" style="--c:var(--v-'+(c==='U'?'U':c)+')" data-env="[H: |]" title="Passage harmonisé">Harmonie</button>'
+   +'<button class="btn harmo-btn" style="--c:var(--v-'+(c==='U'?'U':c)+')" data-env="[H1: |]" title="Passage de la division 1">H1</button>'
+   +'<button class="btn harmo-btn" style="--c:var(--v-'+(c==='U'?'U':c)+')" data-env="[H2: |]" title="Passage de la division 2">H2</button>'
+   +'<button class="btn" data-ins=" | " title="Séparer deux passages chantés en même temps">|</button>'
    +'<button class="btn" data-env="[U: |]" title="Retour à l’unisson">Unisson</button>'
    +'<button class="btn" data-env="*|*"><b>Appuyé</b></button><button class="btn" data-env="==|==">Surligné</button><button class="btn" data-env="~~|~~"><s>Barré</s></button>'
    +'<button class="btn" data-env="(|)"><i>(Traduction)</i></button><button class="btn" data-ligne="## ">Section</button>';
