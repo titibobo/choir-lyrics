@@ -98,6 +98,9 @@ input[type=text],input[type=password],select{background:var(--surface);border:1p
 .champ{display:flex;flex-direction:column;gap:.25rem}
 .champ > label,.etiquette{font-size:.8rem;color:var(--discret)}
 #chant{font-family:var(--titre);font-weight:700;font-size:1.1rem}
+.voix-feuille{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--discret)}
+.voix-feuille i{width:.75rem;height:.75rem;border-radius:50%;flex:none}
+.voix-feuille select{color:var(--encre)}
 .choix-voix{display:flex;flex-wrap:wrap;gap:.35rem}
 .choix-voix button{border:2px solid var(--c);background:var(--surface);color:var(--encre);border-radius:999px;padding:.25rem .7rem;font-size:.85rem;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem}
 .choix-voix button i{width:.65rem;height:.65rem;border-radius:50%;background:var(--c)}
@@ -470,9 +473,9 @@ function majEditeur(){
    +'<div class="credits-ed"><div class="champ"><label for="arrangement">Arrangements vocaux</label><input type="text" id="arrangement" value="'+esc(credits(e).arr)+'"></div>'
    +'<div class="champ"><label for="versionTxt">Version</label><input type="text" id="versionTxt" value="'+esc(credits(e).ver)+'"></div></div>'
    +'<div id="validation"></div>'
-   +'<div class="champ"><span class="etiquette" id="lbl-voix">Voix de cette feuille</span><div class="choix-voix" role="group" aria-labelledby="lbl-voix">'
-   +VOIX.map(function(v){var pris=prises[v.code+'|'+(e.variante||'')];return '<button type="button" class="'+(v.code==='U'?'unisson':'')+'"'+(v.code==='U'?'':' style="--c:var(--v-'+v.code+')"')+' data-voix="'+v.code+'" aria-pressed="'+(e.voix===v.code)+'"'+(pris?' disabled title="Ce chant a déjà une feuille '+esc(v.nom+(e.variante?' '+e.variante:''))+'"':'')+'><i></i>'+esc(v.nom)+'</button>'}).join('')
-   +'</div></div>'
+   +'<div class="voix-feuille"><label for="voix-feuille">Voix de cette feuille</label><i style="background:var(--v-'+e.voix+')"></i><select id="voix-feuille">'
+   +VOIX.map(function(v){var pris=prises[v.code+'|'+(e.variante||'')];return '<option value="'+v.code+'"'+(e.voix===v.code?' selected':'')+(pris?' disabled':'')+'>'+esc(v.nom)+(pris?' (existe déjà)':'')+'</option>'}).join('')
+   +'</select></div>'
    +'<div class="outils" id="outils">'+outilsHTML()+'</div>'
    +'<div class="champ"><label for="paroles">Paroles</label><textarea id="paroles" spellcheck="false">'+esc(e.texte)+'</textarea></div>'
    +'<div class="actions"><button class="btn principal" data-a="enregistrer">Enregistrer</button>'
@@ -733,6 +736,7 @@ document.addEventListener('change',function(ev){
   var t=ev.target;
   if(t.id==='format'||t.id==='montees'||t.id==='colonnes'){reglages[t.id]=t.value;ecrire('chorale-reglages',reglages);majApercu()}
   if(t.id==='chant'&&S.ed){majListe()}
+  if(t.id==='voix-feuille'&&S.ed){S.ed.voix=t.value;if(t.value==='U')S.ed.variante='';majEditeur();majListe();modifier()}
   if(t.id==='variante'&&S.ed){S.ed.variante=t.value;majEditeur();modifier()}
 });
 document.addEventListener('keydown',function(ev){
